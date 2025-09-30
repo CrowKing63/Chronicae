@@ -1,0 +1,350 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  background: radial-gradient(circle at 10% 20%, #1b2335 0%, #090d16 55%, #040508 100%);
+  color: #f3f6ff;
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+.stage {
+  padding: 48px 64px 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar .meta {
+  margin-top: 4px;
+  color: rgba(243, 246, 255, 0.62);
+}
+
+.badge {
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.badge--connected {
+  background: rgba(80, 226, 143, 0.2);
+  color: #17ff8c;
+}
+
+.badge--error {
+  background: rgba(255, 88, 88, 0.2);
+  color: #ff6d6d;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr 320px;
+  gap: 24px;
+}
+
+.panel {
+  background: rgba(8, 12, 20, 0.78);
+  border-radius: 24px;
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(126, 160, 255, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel__header {
+    padding: 24px 28px 16px;
+    border-bottom: 1px solid rgba(126, 160, 255, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.panel__actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.panel__body {
+  padding: 18px 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.tag-filter input {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(126, 160, 255, 0.32);
+    border-radius: 12px;
+    padding: 10px 14px;
+  color: inherit;
+  width: 180px;
+}
+
+.tag-filter input:focus {
+  outline: none;
+  border-color: rgba(114, 185, 255, 0.78);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.list--empty {
+  padding: 32px 28px;
+}
+
+.list__item {
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: rgba(20, 26, 36, 0.8);
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.list__item:hover {
+  transform: translateY(-1px);
+  background: rgba(32, 40, 56, 0.92);
+}
+
+.list__item--active {
+  border: 1px solid rgba(112, 189, 255, 0.7);
+  background: rgba(36, 48, 74, 0.92);
+}
+
+.list__title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.list__meta {
+  font-size: 0.85rem;
+  color: rgba(243, 246, 255, 0.6);
+}
+
+.list__excerpt {
+  margin: 12px 0 10px;
+  color: rgba(243, 246, 255, 0.78);
+  line-height: 1.5;
+}
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(126, 160, 255, 0.28);
+    background: rgba(126, 160, 255, 0.12);
+    font-size: 0.85rem;
+}
+
+.chip--interactive {
+    cursor: pointer;
+    transition: background 0.16s ease, transform 0.16s ease;
+    border: 1px solid rgba(126, 160, 255, 0.28);
+    background: rgba(126, 160, 255, 0.12);
+    color: inherit;
+    font: inherit;
+    line-height: inherit;
+    display: inline-flex;
+    align-items: center;
+}
+
+.chip--interactive:hover {
+    transform: translateY(-1px);
+    background: rgba(126, 160, 255, 0.22);
+}
+
+.chip--selected {
+    border-color: rgba(112, 189, 255, 0.7);
+    background: rgba(36, 48, 74, 0.92);
+}
+
+.chip--compact {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+
+.note-preview {
+  padding: 24px 30px;
+  line-height: 1.6;
+  color: rgba(243, 246, 255, 0.88);
+}
+
+.note-preview code {
+  background: rgba(12, 16, 28, 0.9);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.note-preview pre {
+  background: rgba(12, 16, 28, 0.9);
+  padding: 14px 18px;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.diff {
+  background: rgba(12, 16, 28, 0.9);
+  border-radius: 16px;
+  padding: 18px 20px;
+  font-family: 'SFMono-Regular', ui-monospace, SFMono, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  max-height: 220px;
+}
+
+.diff__line {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.diff__line--added {
+  color: #5fe39f;
+}
+
+.diff__line--removed {
+  color: #ff8686;
+}
+
+.diff__marker {
+    opacity: 0.65;
+}
+
+.toast-stack {
+  position: fixed;
+  right: 36px;
+  bottom: 42px;
+  display: grid;
+  gap: 12px;
+  z-index: 1000;
+}
+
+.toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(20, 26, 36, 0.92);
+  border-radius: 14px;
+  padding: 12px 18px;
+  border: 1px solid rgba(126, 160, 255, 0.28);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
+}
+
+.toast__icon {
+    font-size: 1.2rem;
+}
+
+.placeholder {
+    opacity: 0.55;
+}
+
+.button {
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(126, 160, 255, 0.32);
+    background: rgba(255, 255, 255, 0.06);
+    color: inherit;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.16s ease, transform 0.16s ease;
+}
+
+.button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.button--primary {
+    background: linear-gradient(120deg, #4f9cff, #22d1ee);
+    border: none;
+    color: #ffffff;
+    box-shadow: 0 10px 32px rgba(23, 112, 255, 0.28);
+}
+
+.button--primary:hover:not(:disabled) {
+    background: linear-gradient(120deg, #66aaff, #2ce0ff);
+}
+
+.button--ghost {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.input,
+.textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(126, 160, 255, 0.32);
+    background: rgba(12, 16, 28, 0.9);
+    color: inherit;
+}
+
+.input:focus,
+.textarea:focus {
+    outline: none;
+    border-color: rgba(114, 185, 255, 0.78);
+    box-shadow: 0 0 0 2px rgba(114, 185, 255, 0.18);
+}
+
+.textarea {
+    resize: vertical;
+    min-height: 220px;
+}
+
+.note-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 0 30px 24px 30px;
+}
+
+.note-editor__field {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.note-editor__label {
+    font-weight: 600;
+    color: rgba(243, 246, 255, 0.72);
+}
+
+@media (max-width: 1440px) {
+  .layout {
+    grid-template-columns: 280px 1fr 280px;
+  }
+}

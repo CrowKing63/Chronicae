@@ -200,9 +200,29 @@ final class SimpleHTTPServer {
         }
 
         Task { @MainActor in
+            if request.path == "/events" || request.path == "/api/events" {
+                self.handleEventStream(connection: connection)
+                return
+            }
             let response = handler(request)
             self.send(response: response, over: connection)
         }
+    }
+
+    private func handleEventStream(connection: NWConnection) {
+        let headers = "HTTP/1.1 200 OK\r\n" +
+            "Content-Type: text/event-stream\r\n" +
+            "Cache-Control: no-cache\r\n" +
+            "Connection: keep-alive\r\n" +
+            "Access-Control-Allow-Origin: *\r\n\r\n"
+        let data = Data(headers.utf8)
+        connection.send(content: data, completion: .contentProcessed { error in
+            if error == nil {
+                Task { await ServerEventCenter.shared.registerHTTP(connection: connection) }
+            } else {
+                connection.cancel()
+            }
+        })
     }
 
     @MainActor

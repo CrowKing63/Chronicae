@@ -20,10 +20,24 @@ struct ContentView: View {
         .task {
             await serverManager.startIfNeeded()
             appState.serverStatus = serverManager.status
+            await appState.refreshProjects(using: serverManager)
+            await appState.refreshNotes(using: serverManager)
+            await appState.refreshBackup(using: serverManager)
+            await appState.startEventStream(using: serverManager)
         }
         .onChange(of: serverManager.status) { _, newStatus in
             appState.serverStatus = newStatus
             appState.lastUpdated = .now
+            if case .running = newStatus {
+                Task {
+                    await appState.refreshProjects(using: serverManager)
+                    await appState.refreshNotes(using: serverManager)
+                    await appState.refreshBackup(using: serverManager)
+                    await appState.startEventStream(using: serverManager)
+                }
+            } else {
+                Task { await appState.stopEventStream() }
+            }
         }
         .frame(minWidth: 1080, minHeight: 720)
     }
@@ -50,7 +64,7 @@ struct ContentView: View {
         case .storage:
             StorageManagementView(appState: appState, serverManager: serverManager)
         case .versions:
-            VersionsView(appState: appState)
+            VersionsView(appState: appState, serverManager: serverManager)
         case .settings:
             SettingsView(appState: appState, serverManager: serverManager)
         }

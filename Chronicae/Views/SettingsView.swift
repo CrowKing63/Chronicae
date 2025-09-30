@@ -7,6 +7,8 @@ struct SettingsView: View {
 
     @State private var configuration = ServerConfiguration()
     @State private var autoStart = true
+    @State private var isRunningBackup = false
+    @State private var errorMessage: String?
 
     var body: some View {
         Form {
@@ -28,8 +30,12 @@ struct SettingsView: View {
 
             Section("백업") {
                 Toggle("자동 백업", isOn: $autoStart)
-                Button("지금 백업 실행") {
-                    // TODO: 백업 API 호출 연결
+                Button("지금 백업 실행") { runBackup() }
+                    .disabled(isRunningBackup)
+                if let status = formattedBackupStatus {
+                    Text(status)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -51,8 +57,18 @@ struct SettingsView: View {
         .padding(24)
         .formStyle(.grouped)
         .onAppear(perform: syncConfiguration)
+        .task {
+            await appState.refreshBackup(using: serverManager)
+        }
         .onChange(of: configuration) { _, newValue in
             serverManager.updateConfiguration(newValue)
+        }
+        .alert("오류", isPresented: Binding(get: { errorMessage != nil }, set: { _ in errorMessage = nil })) {
+            Button("확인", role: .cancel) { errorMessage = nil }
+        } message: {
+            if let errorMessage {
+                Text(errorMessage)
+            }
         }
     }
 
@@ -71,5 +87,34 @@ struct SettingsView: View {
 
     private func syncConfiguration() {
         configuration = serverManager.currentConfiguration()
+    }
+
+    private func runBackup() {
+        Task {
+            await MainActor.run {
+                isRunningBackup = true
+                errorMessage = nil
+            }
+            do {
+                let client = serverManager.makeAPIClient()
+                let record = try await client.runBackup()
+                await MainActor.run {
+                    appState.recordBackup(record)
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                }
+            }
+            await MainActor.run { isRunningBackup = false }
+        }
+    }
+
+    private var formattedBackupStatus: String? {
+        guard let record = appState.lastBackupRecord else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return "마지막 백업: \(formatter.string(from: record.completedAt))"
     }
 }

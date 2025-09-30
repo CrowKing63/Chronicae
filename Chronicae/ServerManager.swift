@@ -53,6 +53,27 @@ final class ServerManager {
         Self.logger.error("Server listener failure: \(message)")
         status = .error(.init(message: message, timestamp: .now))
     }
+
+    func makeAPIClient() -> ServerAPIClient {
+        let port: Int
+        if case .running(let runtime) = status {
+            port = runtime.port
+        } else {
+            port = configuration.port
+        }
+        let url = URL(string: "http://127.0.0.1:\(port)")!
+        return ServerAPIClient(baseURL: url)
+    }
+
+    func eventsURL() -> URL {
+        let port: Int
+        if case .running(let runtime) = status {
+            port = runtime.port
+        } else {
+            port = configuration.port
+        }
+        return URL(string: "http://127.0.0.1:\(port)/api/events")!
+    }
 }
 
 @MainActor
@@ -60,6 +81,7 @@ final class ServerWorker {
     private var runtime: ServerStatus.ServerRuntime?
     private var configuration = ServerConfiguration()
     private var httpServer: SimpleHTTPServer?
+    private let apiRouter = APIRouter()
     #if canImport(Vapor)
     private var application: Application?
     #endif
@@ -150,6 +172,10 @@ final class ServerWorker {
 
         let baseResponse: HTTPResponse
 
+        if let apiResponse = apiRouter.response(for: request) {
+            return applyMethodOverrides(response: apiResponse, method: method)
+        }
+
         switch path {
         case "/", "/index.html":
             baseResponse = HTTPResponse.text(WebAssets.indexHTML, contentType: "text/html; charset=utf-8")
@@ -191,29 +217,8 @@ final class ServerWorker {
             </html>
             """
             baseResponse = HTTPResponse.text(html, contentType: "text/html; charset=utf-8")
-        case "/web-app":
-            let html = """
-            <!DOCTYPE html>
-            <html lang=\"ko\">
-            <head><meta charset=\"utf-8\" /><title>Chronicae Web</title></head>
-            <body style=\"font-family:-apple-system, sans-serif; margin:40px;\">
-            <h1>Chronicae Vision Pro 웹앱 (프리뷰)</h1>
-            <p>정식 SPA는 추후 배포됩니다. 현재는 서버 상태 확인만 가능합니다.</p>
-            <pre id=\"status\">Loading...</pre>
-            <script>
-            fetch('/api/status')
-              .then(res => res.json())
-              .then(data => {
-                document.getElementById('status').textContent = JSON.stringify(data, null, 2);
-              })
-              .catch(err => {
-                document.getElementById('status').textContent = '오류: ' + err.message;
-              });
-            </script>
-            </body>
-            </html>
-            """
-            baseResponse = HTTPResponse.text(html, contentType: "text/html; charset=utf-8")
+        case _ where path.hasPrefix("/web-app"):
+            baseResponse = VisionWebApp.response(for: path)
         case "/favicon.ico":
             baseResponse = HTTPResponse(statusCode: 204, reasonPhrase: "No Content")
         default:
@@ -231,6 +236,22 @@ final class ServerWorker {
             return HTTPResponse(statusCode: 405,
                                  reasonPhrase: "Method Not Allowed",
                                  headers: ["Allow": "GET, HEAD"],
+                                 body: Data())
+        }
+    }
+
+    private func applyMethodOverrides(response: HTTPResponse, method: String) -> HTTPResponse {
+        switch method {
+        case "GET", "POST", "PUT", "PATCH", "DELETE":
+            return response
+        case "HEAD":
+            var headResponse = response
+            headResponse.body = Data()
+            return headResponse
+        default:
+            return HTTPResponse(statusCode: 405,
+                                 reasonPhrase: "Method Not Allowed",
+                                 headers: ["Allow": "GET, HEAD, POST, PUT, PATCH, DELETE"],
                                  body: Data())
         }
     }
