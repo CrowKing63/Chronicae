@@ -56,7 +56,7 @@
 
 - `GET /settings`
   - **설명**: 네트워크/보안/백업 설정 조회.
-  - **응답**: `{ "port": 8443, "allowExternal": false, "auth": { "type": "basic", "token": null }, "backups": { "auto": true, "intervalHours": 6 } }`
+  - **응답**: `{ "port": 8443, "allowExternal": true, "auth": { "type": "basic", "token": null }, "backups": { "auto": true, "intervalHours": 6 } }`
 
 - `PUT /settings`
   - **설명**: 설정 변경. 필요 필드만 전송.
