@@ -1,16 +1,16 @@
 import Foundation
 
-struct NoteIdentifierPayload: Codable {
+struct NoteIdentifierPayload: Codable, Sendable {
     let id: UUID
     let projectId: UUID
 }
 
-struct ExportJobIdentifierPayload: Codable {
+struct ExportJobIdentifierPayload: Codable, Sendable {
     let projectId: UUID
     let versionId: UUID?
 }
 
-struct BackupRecordPayload: Codable {
+struct BackupRecordPayload: Codable, Sendable {
     let id: UUID
     let startedAt: Date
     let completedAt: Date

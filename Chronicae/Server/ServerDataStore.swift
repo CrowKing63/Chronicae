@@ -4,10 +4,9 @@ import OSLog
 
 @MainActor
 final class ServerDataStore {
-    private static let defaultActiveProjectKey = "com.chronicae.server.activeProjectID"
     static let shared = ServerDataStore(persistentStore: .shared)
 
-    struct ExportJob: Identifiable, Codable {
+    struct ExportJob: Identifiable, Codable, Sendable {
         enum Status: String, Codable {
             case queued
             case completed
@@ -20,7 +19,7 @@ final class ServerDataStore {
         var createdAt: Date
     }
 
-    struct BackupRecord: Identifiable, Codable {
+    struct BackupRecord: Identifiable, Codable, Sendable {
         enum Status: String, Codable {
             case success
             case failed
@@ -38,10 +37,16 @@ final class ServerDataStore {
     private let logger = Logger(subsystem: "com.chronicae.app", category: "ServerDataStore")
     private let defaults: UserDefaults
     private let activeProjectKey: String
+    private let eventEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+        return encoder
+    }()
 
     init(persistentStore: ServerPersistentStore,
          defaults: UserDefaults = .standard,
-         activeProjectKey: String = ServerDataStore.defaultActiveProjectKey,
+         activeProjectKey: String = "com.chronicae.server.activeProjectID",
          seedOnFirstLaunch: Bool = true) {
         self.persistentStore = persistentStore
         self.context = persistentStore.viewContext
@@ -105,7 +110,7 @@ final class ServerDataStore {
         project.lastIndexedAt = Date()
         saveIfNeeded()
         let summary = makeProjectSummary(from: project)
-        Task { await ServerEventCenter.shared.publish(ServerEvent(type: .projectReset, payload: summary)) }
+        publishEvent(type: .projectReset, payload: summary)
         return summary
     }
 
@@ -117,7 +122,7 @@ final class ServerDataStore {
         if activeProjectId == id {
             activeProjectId = listProjects().items.first?.id
         }
-        Task { await ServerEventCenter.shared.publish(ServerEvent(type: .projectDeleted, payload: summary)) }
+        publishEvent(type: .projectDeleted, payload: summary)
     }
 
     // MARK: - Notes
@@ -156,7 +161,7 @@ final class ServerDataStore {
         project.lastIndexedAt = now
         saveIfNeeded()
         let summary = makeNoteSummary(from: note)
-        Task { await ServerEventCenter.shared.publish(ServerEvent(type: .noteCreated, payload: summary)) }
+        publishEvent(type: .noteCreated, payload: summary)
         return summary
     }
 
@@ -172,7 +177,7 @@ final class ServerDataStore {
         note.project.lastIndexedAt = note.updatedAt
         saveIfNeeded()
         let summary = makeNoteSummary(from: note)
-        Task { await ServerEventCenter.shared.publish(ServerEvent(type: .noteUpdated, payload: summary)) }
+        publishEvent(type: .noteUpdated, payload: summary)
         return summary
     }
 
@@ -184,13 +189,13 @@ final class ServerDataStore {
         updateNoteCount(for: project)
         project.lastIndexedAt = Date()
         saveIfNeeded()
-        Task { await ServerEventCenter.shared.publish(ServerEvent(type: .noteDeleted, payload: payload)) }
+        publishEvent(type: .noteDeleted, payload: payload)
     }
 
     // MARK: - Versions & backups
 
     func listVersions(noteId: UUID, limit: Int = 50) -> [VersionSnapshot]? {
-        guard let note = fetchNoteEntity(projectId: nil, noteId: noteId) else { return nil }
+        guard fetchNoteEntity(projectId: nil, noteId: noteId) != nil else { return nil }
         let request: NSFetchRequest<CDNoteVersion> = CDNoteVersion.fetchRequest()
         request.predicate = NSPredicate(format: "note.id == %@", noteId as CVarArg)
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
@@ -211,7 +216,7 @@ final class ServerDataStore {
         note.project.lastIndexedAt = note.updatedAt
         saveIfNeeded()
         let snapshot = makeVersionSnapshot(from: newSnapshot)
-        Task { await ServerEventCenter.shared.publish(ServerEvent(type: .noteVersionRestored, payload: snapshot)) }
+        publishEvent(type: .noteVersionRestored, payload: snapshot)
         return snapshot
     }
 
@@ -238,7 +243,7 @@ final class ServerDataStore {
         saveIfNeeded()
         let export = makeExportJob(from: job)
         let payload = ExportJobIdentifierPayload(projectId: export.projectId, versionId: export.versionId)
-        Task { await ServerEventCenter.shared.publish(ServerEvent(type: .noteExportQueued, payload: payload)) }
+        publishEvent(type: .noteExportQueued, payload: payload)
         return export
     }
 
@@ -253,7 +258,7 @@ final class ServerDataStore {
         saveIfNeeded()
         let export = makeExportJob(from: job)
         let payload = ExportJobIdentifierPayload(projectId: export.projectId, versionId: export.versionId)
-        Task { await ServerEventCenter.shared.publish(ServerEvent(type: .noteVersionExportQueued, payload: payload)) }
+        publishEvent(type: .noteVersionExportQueued, payload: payload)
         return export
     }
 
@@ -272,7 +277,7 @@ final class ServerDataStore {
                                           completedAt: backup.completedAt,
                                           status: backup.status.rawValue,
                                           artifactPath: backup.artifactPath)
-        Task { await ServerEventCenter.shared.publish(ServerEvent(type: .backupCompleted, payload: payload)) }
+        publishEvent(type: .backupCompleted, payload: payload)
         return backup
     }
 
@@ -400,6 +405,15 @@ final class ServerDataStore {
         } catch {
             context.rollback()
             logger.error("Failed to save context: \(error.localizedDescription)")
+        }
+    }
+
+    private func publishEvent<T: Encodable>(type: AppEventType, payload: T) {
+        do {
+            let data = try eventEncoder.encode(payload)
+            Task { await ServerEventCenter.shared.publish(type: type, payloadJSON: data) }
+        } catch {
+            logger.error("Failed to encode event \(type.rawValue): \(error.localizedDescription)")
         }
     }
 

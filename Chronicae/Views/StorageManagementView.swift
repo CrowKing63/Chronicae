@@ -34,8 +34,8 @@ struct StorageManagementView: View {
             if let errorMessage { Text(errorMessage) }
         }
         .task { await initialLoadIfNeeded() }
-        .onChange(of: appState.selectedNote?.id) { _ in loadDraftFromSelection() }
-        .onChange(of: appState.notes) { _ in loadDraftFromSelection() }
+        .onChange(of: appState.selectedNote?.id) { loadDraftFromSelection() }
+        .onChange(of: appState.notes) { loadDraftFromSelection() }
         .overlay(alignment: .top) {
             if let toast {
                 BannerToastView(message: toast)
@@ -266,14 +266,14 @@ struct StorageManagementView: View {
             newProjectName = ""
             showToast("프로젝트를 생성했습니다", systemImage: "checkmark.circle")
         }) { client in
-            try await client.createProject(name: name)
+            _ = try await client.createProject(name: name)
         }
     }
 
     private func switchProject(_ id: UUID) {
         guard appState.activeProject?.id != id else { return }
         performProjectMutation { client in
-            try await client.switchProject(id: id)
+            _ = try await client.switchProject(id: id)
         }
     }
 
@@ -281,7 +281,7 @@ struct StorageManagementView: View {
         performProjectMutation(onSuccess: {
             showToast("프로젝트를 초기화했습니다", systemImage: "arrow.counterclockwise")
         }) { client in
-            try await client.resetProject(id: project.id)
+            _ = try await client.resetProject(id: project.id)
         }
     }
 

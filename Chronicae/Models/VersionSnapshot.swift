@@ -1,6 +1,6 @@
 import Foundation
 
-struct VersionSnapshot: Identifiable, Hashable, Codable {
+struct VersionSnapshot: Identifiable, Hashable, Codable, Sendable {
     let id: UUID
     var title: String
     var timestamp: Date

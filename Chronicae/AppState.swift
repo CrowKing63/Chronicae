@@ -213,7 +213,7 @@ import Observation
     }
 }
 
-struct ProjectSummary: Identifiable, Hashable, Codable {
+struct ProjectSummary: Identifiable, Hashable, Codable, Sendable {
     let id: UUID
     var name: String
     var noteCount: Int

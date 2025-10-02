@@ -5,9 +5,9 @@ struct APIRouter {
     private let dataStore: ServerDataStore
     private let configurationProvider: @MainActor () -> ServerConfiguration
 
-    init(dataStore: ServerDataStore = .shared,
+    init(dataStore: ServerDataStore? = nil,
          configurationProvider: @escaping @MainActor () -> ServerConfiguration = { ServerConfiguration() }) {
-        self.dataStore = dataStore
+        self.dataStore = dataStore ?? ServerDataStore.shared
         self.configurationProvider = configurationProvider
     }
 

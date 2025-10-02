@@ -5,11 +5,6 @@ import Network
 import Vapor
 #endif
 
-struct ServerEvent: Sendable {
-    var type: AppEventType
-    var payload: any Encodable
-}
-
 actor ServerEventCenter {
     static let shared = ServerEventCenter()
 
@@ -40,13 +35,8 @@ actor ServerEventCenter {
 #endif
 
     private var httpClients: [UUID: HTTPClient] = [:]
-    private let encoder: JSONEncoder
 
     private init() {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.sortedKeys]
-        self.encoder = encoder
         Task.detached { [weak self] in
             await self?.startPingLoop()
         }
@@ -73,19 +63,13 @@ actor ServerEventCenter {
     }
 #endif
 
-    func publish(_ event: ServerEvent) {
-        Task { await broadcast(event: event) }
+    func publish(type: AppEventType, payloadJSON: Data) {
+        Task { await broadcast(type: type, payloadJSON: payloadJSON) }
     }
 
-    private func broadcast(event: ServerEvent) async {
-        let jsonData: Data
-        do {
-            jsonData = try encoder.encode(AnyEncodable(event.payload))
-        } catch {
-            return
-        }
-        guard let jsonString = String(data: jsonData, encoding: .utf8) else { return }
-        let message = "event: \(event.type.rawValue)\ndata: \(jsonString)\n\n"
+    private func broadcast(type: AppEventType, payloadJSON: Data) async {
+        guard let jsonString = String(data: payloadJSON, encoding: .utf8) else { return }
+        let message = "event: \(type.rawValue)\ndata: \(jsonString)\n\n"
         for client in httpClients.values {
             sendRaw(to: client, text: message)
         }
@@ -138,17 +122,5 @@ actor ServerEventCenter {
             await sendRaw(to: client, text: pingPayload)
         }
 #endif
-    }
-}
-
-private struct AnyEncodable: Encodable {
-    private let _encode: (Encoder) throws -> Void
-
-    init(_ wrapped: any Encodable) {
-        _encode = wrapped.encode
-    }
-
-    func encode(to encoder: Encoder) throws {
-        try _encode(encoder)
     }
 }

@@ -23,7 +23,7 @@ struct ContentView: View {
             await appState.refreshProjects(using: serverManager)
             await appState.refreshNotes(using: serverManager)
             await appState.refreshBackup(using: serverManager)
-            await appState.startEventStream(using: serverManager)
+            appState.startEventStream(using: serverManager)
         }
         .onChange(of: serverManager.status) { _, newStatus in
             appState.serverStatus = newStatus
@@ -33,10 +33,10 @@ struct ContentView: View {
                     await appState.refreshProjects(using: serverManager)
                     await appState.refreshNotes(using: serverManager)
                     await appState.refreshBackup(using: serverManager)
-                    await appState.startEventStream(using: serverManager)
+                    await MainActor.run { appState.startEventStream(using: serverManager) }
                 }
             } else {
-                Task { await appState.stopEventStream() }
+                Task { await MainActor.run { appState.stopEventStream() } }
             }
         }
         .frame(minWidth: 1080, minHeight: 720)
