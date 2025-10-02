@@ -5,13 +5,14 @@ type Props = {
   notes: NoteSummary[];
   selectedId: string | null;
   onSelect: (noteId: string) => void;
+  emptyMessage?: string;
 };
 
-export const NoteList: FC<Props> = ({ notes, selectedId, onSelect }) => {
+export const NoteList: FC<Props> = ({ notes, selectedId, onSelect, emptyMessage }) => {
   if (!notes.length) {
     return (
       <div className="list list--empty">
-        <p className="placeholder">노트가 없습니다. macOS 앱에서 노트를 추가하면 실시간으로 반영됩니다.</p>
+        <p className="placeholder">{emptyMessage ?? '노트가 없습니다. macOS 앱에서 노트를 추가하면 실시간으로 반영됩니다.'}</p>
       </div>
     );
   }

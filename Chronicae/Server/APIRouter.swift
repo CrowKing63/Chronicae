@@ -3,12 +3,18 @@ import Foundation
 @MainActor
 struct APIRouter {
     private let dataStore: ServerDataStore
+    private let configurationProvider: @MainActor () -> ServerConfiguration
 
-    init(dataStore: ServerDataStore = .shared) {
+    init(dataStore: ServerDataStore = .shared,
+         configurationProvider: @escaping @MainActor () -> ServerConfiguration = { ServerConfiguration() }) {
         self.dataStore = dataStore
+        self.configurationProvider = configurationProvider
     }
 
     func response(for request: HTTPRequest) -> HTTPResponse? {
+        if let failure = authorizationFailureIfNeeded(for: request) {
+            return failure
+        }
         guard request.path.hasPrefix("/api") else { return nil }
 
         let pathComponents = request.path.split(separator: "/").map(String.init)
@@ -258,6 +264,37 @@ struct APIRouter {
         case 500: return "Internal Server Error"
         default: return "OK"
         }
+    }
+
+    func authorizationFailureIfNeeded(for request: HTTPRequest) -> HTTPResponse? {
+        guard requiresAuthorization(path: request.path) else { return nil }
+        guard let token = normalizedToken() else { return nil }
+        guard let header = request.headerValue(for: "Authorization"),
+              isValidAuthorizationHeader(header, token: token) else {
+            var response = httpError(status: 401, code: "unauthorized", message: "Authentication required")
+            response.headers["WWW-Authenticate"] = "Bearer"
+            return response
+        }
+        return nil
+    }
+
+    private func requiresAuthorization(path: String) -> Bool {
+        if path == "/events" || path.hasPrefix("/events?") {
+            return true
+        }
+        return path.hasPrefix("/api")
+    }
+
+    private func normalizedToken() -> String? {
+        let token = configurationProvider().authToken?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let token, !token.isEmpty else { return nil }
+        return token
+    }
+
+    private func isValidAuthorizationHeader(_ header: String, token: String) -> Bool {
+        let components = header.split(separator: " ", maxSplits: 1).map(String.init)
+        guard components.count == 2 else { return false }
+        return components[0].caseInsensitiveCompare("Bearer") == .orderedSame && components[1] == token
     }
 }
 

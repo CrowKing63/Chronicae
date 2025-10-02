@@ -62,7 +62,7 @@ final class ServerManager {
             port = configuration.port
         }
         let url = URL(string: "http://127.0.0.1:\(port)")!
-        return ServerAPIClient(baseURL: url)
+        return ServerAPIClient(baseURL: url, authToken: configuration.authToken)
     }
 
     func eventsURL() -> URL {
@@ -81,7 +81,10 @@ final class ServerWorker {
     private var runtime: ServerStatus.ServerRuntime?
     private var configuration = ServerConfiguration()
     private var httpServer: SimpleHTTPServer?
-    private let apiRouter = APIRouter()
+    private lazy var apiRouter = APIRouter(configurationProvider: { [weak self] in
+        guard let self else { return ServerConfiguration() }
+        return self.configuration
+    })
     #if canImport(Vapor)
     private var application: Application?
     #endif
@@ -102,6 +105,10 @@ final class ServerWorker {
             handler: { [weak self] request in
                 guard let self else { return HTTPResponse.notFound() }
                 return self.handleOnMain(request: request)
+            },
+            authorizationHandler: { [weak self] request in
+                guard let self else { return nil }
+                return self.apiRouter.authorizationFailureIfNeeded(for: request)
             },
             eventHandler: { [weak self] event in
                 Task { @MainActor [weak self] in
@@ -171,6 +178,10 @@ final class ServerWorker {
         let path = request.path
 
         let baseResponse: HTTPResponse
+
+        if let failure = apiRouter.authorizationFailureIfNeeded(for: request) {
+            return failure
+        }
 
         if let apiResponse = apiRouter.response(for: request) {
             return applyMethodOverrides(response: apiResponse, method: method)

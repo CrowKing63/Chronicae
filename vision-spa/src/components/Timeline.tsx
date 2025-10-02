@@ -15,9 +15,13 @@ export const Timeline: FC<Props> = ({ versions, selectedId, onSelect }) => (
         className={`list__item${version.id === selectedId ? ' list__item--active' : ''}`}
         onClick={() => onSelect(version.id)}
       >
-        <strong>{version.title}</strong>
-        <br />
-        <small>{new Date(version.timestamp).toLocaleString()}</small>
+        <div className="timeline__header">
+          <strong>{version.title || '제목 없음'}</strong>
+          <small>{new Date(version.timestamp).toLocaleString()}</small>
+        </div>
+        <p className="timeline__preview">
+          {(version.preview ?? '').replace(/\n+/g, ' ').trim().slice(0, 140) || '내용 미리보기를 불러올 수 없습니다.'}
+        </p>
       </li>
     ))}
   </ul>

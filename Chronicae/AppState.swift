@@ -129,7 +129,8 @@ import Observation
             Task { @MainActor in self.scheduleReconnect(using: serverManager) }
         })
         eventStreamClient = client
-        client.start(url: url)
+        let token = serverManager.currentConfiguration().authToken
+        client.start(url: url, token: token)
     }
 
     @MainActor

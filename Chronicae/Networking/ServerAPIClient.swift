@@ -3,10 +3,12 @@ import Foundation
 struct ServerAPIClient {
     private let baseURL: URL
     private let session: URLSession
+    private let authToken: String?
 
-    init(baseURL: URL, session: URLSession = .shared) {
+    init(baseURL: URL, authToken: String? = nil, session: URLSession = .shared) {
         self.baseURL = baseURL
         self.session = session
+        self.authToken = authToken
     }
 
     // MARK: - Projects
@@ -110,6 +112,9 @@ struct ServerAPIClient {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let authToken {
+            request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        }
 
         if !(body is EmptyBody) {
             let encoder = JSONEncoder()

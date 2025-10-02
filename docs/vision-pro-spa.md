@@ -18,6 +18,8 @@
    - `vision-spa/dist` 전체가 `Chronicae/Server/VisionWebApp.generated.swift`로 직렬화됩니다.
 3. Xcode 혹은 앱을 재빌드하면 `/web-app` 경로에서 최신 번들이 서빙됩니다.
 
+> 참고: 현재 기본 루트(`/`) 경로에서는 `Chronicae/Server/WebAssets.swift`에 포함된 경량 웹 편집기가 제공됩니다. Vision Pro SPA는 `/web-app`으로 서빙되며 동일한 REST/SSE 계약을 공유합니다.
+
 ## 오프라인 캐시 & 서비스 워커
 - Service Worker (`/web-app/sw.js`)가 설치 시 `precache-manifest.json`을 읽어 주요 자산을 캐시합니다.
 - `index.html`과 프런트 번들은 해시 기반 경로를 사용하며, 서버는 `ETag`/`Cache-Control` 헤더를 통해 Vision Pro Safari 캐시와 협력합니다.
@@ -35,6 +37,7 @@
 ## Vision Pro Safari 접속
 - iMac에서 Chronicae 서버 실행 후 `http://<iMac-IP>:8843/web-app`으로 접속
 - “외부 접속 허용” 옵션 필요 시 앱 설정 탭에서 활성화
+- 첫 접속 시 기본 웹 클라이언트와 동일하게 토큰 입력 오버레이가 나타납니다. `iCloud Drive/Chronicae/token.json` 파일의 `token` 값을 복사해 붙여넣으면 이후 세션에서 자동 사용됩니다.
 
 ## 향후 확장 아이디어
 - Web App Manifest (`manifest.webmanifest`) 작성 및 Vision Pro 홈 스크린 아이콘 최적화

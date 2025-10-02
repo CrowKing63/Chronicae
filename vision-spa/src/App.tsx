@@ -5,6 +5,7 @@ import { ToastStack } from './components/ToastStack';
 import { Timeline } from './components/Timeline';
 import { NoteList } from './components/NoteList';
 import { DiffView } from './components/DiffView';
+import { MarkdownEditor } from './components/MarkdownEditor';
 import { renderMarkdown, computeDiff } from './utils/diff';
 import { mergeNotes } from './utils/notes';
 
@@ -17,6 +18,14 @@ type NoteDraft = {
   version: number | null;
   projectId: string | null;
   isNew: boolean;
+};
+
+type SavedFilter = {
+  id: string;
+  name: string;
+  query: string;
+  tags: string[];
+  createdAt: string;
 };
 
 const toDraft = (note: NoteSummary): NoteDraft => ({
@@ -49,6 +58,10 @@ const App = () => {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [versions, setVersions] = useState<VersionSnapshot[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [noteQuery, setNoteQuery] = useState('');
+  const [activeTagFilters, setActiveTagFilters] = useState<string[]>([]);
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  const [selectedFilterId, setSelectedFilterId] = useState<string | null>(null);
   const [tagQuery, setTagQuery] = useState('');
   const [statusBadge, setStatusBadge] = useState({ text: '연결 중...', variant: 'badge--idle' });
   const [toasts, setToasts] = useState<{ id: string; icon: string; message: string }[]>([]);
@@ -56,6 +69,7 @@ const App = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRestoringVersion, setIsRestoringVersion] = useState(false);
 
   const selectedNote = useMemo(
     () => notes.find(note => note.id === selectedNoteId) ?? null,
@@ -78,6 +92,53 @@ const App = () => {
       .filter(tag => tag.toLowerCase().includes(tagQuery.toLowerCase()))
       .slice(0, 12);
   }, [allTags, tagQuery]);
+
+  const filterOptions = useMemo(() => allTags.slice(0, 20), [allTags]);
+
+  const filteredNotes = useMemo(() => {
+    const lowerQuery = noteQuery.trim().toLowerCase();
+    if (!lowerQuery && activeTagFilters.length === 0) {
+      return notes;
+    }
+    return notes.filter(note => {
+      const noteTags = note.tags ?? [];
+      const matchesTags = activeTagFilters.every(tag => noteTags.includes(tag));
+      if (!matchesTags) return false;
+      if (!lowerQuery) return true;
+      const haystack = [note.title, note.content, note.excerpt, ...(note.tags ?? [])]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(lowerQuery);
+    });
+  }, [notes, noteQuery, activeTagFilters]);
+
+  const persistedFiltersKey = useMemo(() => activeProjectId ?? 'global', [activeProjectId]);
+
+  const loadSavedFilters = useCallback((): SavedFilter[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem('chronicae.savedFilters.v1');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as Record<string, SavedFilter[]>;
+      return parsed[persistedFiltersKey] ?? [];
+    } catch (error) {
+      console.error('Failed to parse saved filters', error);
+      return [];
+    }
+  }, [persistedFiltersKey]);
+
+  const persistFilters = useCallback((filters: SavedFilter[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem('chronicae.savedFilters.v1');
+      const parsed = raw ? (JSON.parse(raw) as Record<string, SavedFilter[]>) : {};
+      parsed[persistedFiltersKey] = filters;
+      window.localStorage.setItem('chronicae.savedFilters.v1', JSON.stringify(parsed));
+    } catch (error) {
+      console.error('Failed to persist saved filters', error);
+    }
+  }, [persistedFiltersKey]);
 
   const diffData = useMemo(() => {
     if (!selectedNote || !selectedVersion) return [];
@@ -172,6 +233,13 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    setSavedFilters(loadSavedFilters());
+    setSelectedFilterId(null);
+    setNoteQuery('');
+    setActiveTagFilters([]);
+  }, [loadSavedFilters]);
+
+  useEffect(() => {
     if (!isEditing) {
       if (selectedNote) {
         setDraft(toDraft(selectedNote));
@@ -189,6 +257,60 @@ const App = () => {
     }
     loadVersions(activeProjectId, selectedNoteId, true);
   }, [selectedNoteId, activeProjectId, loadVersions]);
+
+  const handleToggleTagFilter = (tag: string) => {
+    setSelectedFilterId(null);
+    setActiveTagFilters(prev => {
+      const exists = prev.includes(tag);
+      return exists ? prev.filter(item => item !== tag) : [...prev, tag];
+    });
+  };
+
+  const handleApplySavedFilter = (filter: SavedFilter) => {
+    setSelectedFilterId(filter.id);
+    setNoteQuery(filter.query);
+    setActiveTagFilters(filter.tags);
+  };
+
+  const handleDeleteFilter = (filterId: string) => {
+    setSavedFilters(prev => {
+      const next = prev.filter(filter => filter.id !== filterId);
+      persistFilters(next);
+      if (selectedFilterId === filterId) {
+        setSelectedFilterId(null);
+      }
+      return next;
+    });
+  };
+
+  const handleSaveCurrentFilter = () => {
+    if (!noteQuery.trim() && activeTagFilters.length === 0) {
+      showErrorToast('저장할 필터 조건이 없습니다. 검색어나 태그를 먼저 선택하세요.');
+      return;
+    }
+    const name = window.prompt('필터 이름을 입력하세요');
+    if (!name || !name.trim()) return;
+    const filter: SavedFilter = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      query: noteQuery,
+      tags: activeTagFilters,
+      createdAt: new Date().toISOString()
+    };
+    setSavedFilters(prev => {
+      const next = [...prev, filter];
+      persistFilters(next);
+      return next;
+    });
+    setSelectedFilterId(filter.id);
+    showToast('필터를 저장했습니다', '📌');
+  };
+
+  const handleClearFilters = () => {
+    setSelectedFilterId(null);
+    setNoteQuery('');
+    setActiveTagFilters([]);
+  };
 
   useEventStream('/api/events', {
     onOpen: () => setStatusBadge({ text: '실시간 동기화 중', variant: 'badge--connected' }),
@@ -285,6 +407,31 @@ const App = () => {
       setDraft(toDraft(selectedNote));
     }
     setIsEditing(false);
+  };
+
+  const handleRestoreVersion = async (versionId: string) => {
+    if (!activeProjectId || !selectedNoteId || isRestoringVersion) return;
+    const version = versions.find(item => item.id === versionId);
+    if (!version) return;
+    if (!window.confirm('선택한 버전으로 복원할까요? 현재 내용이 덮어씌워집니다.')) {
+      return;
+    }
+    setIsRestoringVersion(true);
+    try {
+      const response = await fetch(
+        `/api/projects/${activeProjectId}/notes/${selectedNoteId}/versions/${versionId}:restore`,
+        { method: 'POST' }
+      );
+      if (!response.ok) {
+        showErrorToast(await extractErrorMessage(response));
+        return;
+      }
+      showToast('복원 요청을 전송했습니다', '⏱');
+      await loadNotes(activeProjectId, false);
+      await loadVersions(activeProjectId, selectedNoteId, true);
+    } finally {
+      setIsRestoringVersion(false);
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -392,11 +539,11 @@ const App = () => {
       </div>
 
       <div className="layout">
-        <div className="panel">
+      <div className="panel">
           <header className="panel__header">
             <div>
               <h2>노트</h2>
-              <p className="meta">{notes.length}개</p>
+              <p className="meta">{filteredNotes.length}개 / 총 {notes.length}개</p>
             </div>
             <div className="panel__actions">
               <button
@@ -410,7 +557,94 @@ const App = () => {
             </div>
           </header>
           <div className="panel__body">
-            <NoteList notes={notes} selectedId={selectedNoteId} onSelect={handleSelectNote} />
+            <div className="filter-toolbar">
+              <input
+                type="search"
+                className="input filter-toolbar__search"
+                placeholder="제목, 내용, 태그 검색"
+                value={noteQuery}
+                onChange={event => {
+                  setSelectedFilterId(null);
+                  setNoteQuery(event.target.value);
+                }}
+              />
+              <div className="filter-toolbar__actions">
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={handleSaveCurrentFilter}
+                >
+                  필터 저장
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={handleClearFilters}
+                  disabled={!noteQuery && activeTagFilters.length === 0 && !selectedFilterId}
+                >
+                  초기화
+                </button>
+              </div>
+            </div>
+
+            {savedFilters.length > 0 && (
+              <div className="saved-filters">
+                {savedFilters.map(filter => (
+                  <div key={filter.id} className="saved-filters__item">
+                    <button
+                      type="button"
+                      className={`chip chip--interactive${selectedFilterId === filter.id ? ' chip--selected' : ''}`}
+                      onClick={() => handleApplySavedFilter(filter)}
+                    >
+                      {filter.name}
+                      {(filter.tags.length > 0 || filter.query.trim()) && (
+                        <span className="saved-filters__meta">
+                          {[
+                            filter.query.trim() ? `"${filter.query.trim()}"` : null,
+                            filter.tags.length ? `${filter.tags.length} 태그` : null
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="saved-filters__remove"
+                      onClick={() => handleDeleteFilter(filter.id)}
+                      aria-label={`${filter.name} 필터 삭제`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {filterOptions.length > 0 && (
+              <div className="filter-tags">
+                {filterOptions.map(tag => {
+                  const isActive = activeTagFilters.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      className={`chip chip--interactive${isActive ? ' chip--selected' : ''}`}
+                      onClick={() => handleToggleTagFilter(tag)}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <NoteList
+              notes={filteredNotes}
+              selectedId={selectedNoteId}
+              onSelect={handleSelectNote}
+              emptyMessage={notes.length ? '조건에 해당하는 노트가 없습니다.' : undefined}
+            />
           </div>
         </div>
 
@@ -501,16 +735,14 @@ const App = () => {
                     onChange={event => handleDraftFieldChange('title', event.target.value)}
                   />
                 </label>
-                <label className="note-editor__field">
+                <div className="note-editor__field">
                   <span className="note-editor__label">내용</span>
-                  <textarea
-                    className="textarea"
+                  <MarkdownEditor
                     value={draft.content}
-                    placeholder="내용을 입력하세요"
-                    rows={12}
-                    onChange={event => handleDraftFieldChange('content', event.target.value)}
+                    onChange={value => handleDraftFieldChange('content', value)}
+                    disabled={isSaving}
                   />
-                </label>
+                </div>
                 <label className="note-editor__field">
                   <span className="note-editor__label">태그 (콤마로 구분)</span>
                   <input
@@ -586,8 +818,39 @@ const App = () => {
               <p className="meta">{versions.length}개 버전</p>
             </div>
           </header>
-          <div className="panel__body">
+          <div className="panel__body version-panel">
             <Timeline versions={versions} selectedId={selectedVersionId} onSelect={setSelectedVersionId} />
+            {selectedVersion && (
+              <div className="version-details">
+                <div>
+                  <h3 className="version-details__title">{selectedVersion.title || '제목 없음'}</h3>
+                  <p className="meta">
+                    {new Date(selectedVersion.timestamp).toLocaleString()} · ID {selectedVersion.id}
+                  </p>
+                </div>
+                <div
+                  className="version-details__preview note-preview"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedVersion.preview ?? '') }}
+                />
+                <div className="version-details__actions">
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() => setSelectedVersionId(null)}
+                  >
+                    선택 해제
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--primary"
+                    onClick={() => handleRestoreVersion(selectedVersion.id)}
+                    disabled={isRestoringVersion}
+                  >
+                    {isRestoringVersion ? '복원 중...' : '이 버전으로 복원'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

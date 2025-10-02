@@ -95,9 +95,13 @@ final class SimpleHTTPServer {
     private let queue = DispatchQueue(label: "com.chronicae.http", qos: .userInitiated)
     private let handler: HTTPHandler
     private let eventHandler: (@Sendable (HTTPListenerEvent) -> Void)?
-    
-    init(handler: @escaping HTTPHandler, eventHandler: (@Sendable (HTTPListenerEvent) -> Void)? = nil) {
+    private let authorizationHandler: (@MainActor @Sendable (HTTPRequest) -> HTTPResponse?)?
+
+    init(handler: @escaping HTTPHandler,
+         authorizationHandler: (@MainActor @Sendable (HTTPRequest) -> HTTPResponse?)? = nil,
+         eventHandler: (@Sendable (HTTPListenerEvent) -> Void)? = nil) {
         self.handler = handler
+        self.authorizationHandler = authorizationHandler
         self.eventHandler = eventHandler
     }
 
@@ -201,7 +205,11 @@ final class SimpleHTTPServer {
 
         Task { @MainActor in
             if request.path == "/events" || request.path == "/api/events" {
-                self.handleEventStream(connection: connection)
+                if let failure = self.authorizationHandler?(request) {
+                    self.send(response: failure, over: connection)
+                } else {
+                    self.handleEventStream(connection: connection)
+                }
                 return
             }
             let response = handler(request)
@@ -260,5 +268,17 @@ enum HTTPParser {
         }
 
         return HTTPRequest(method: method, path: path, version: version, headers: headers, body: body)
+    }
+}
+
+extension HTTPRequest {
+    func headerValue(for name: String) -> String? {
+        let target = name.lowercased()
+        for (key, value) in headers {
+            if key.lowercased() == target {
+                return value
+            }
+        }
+        return nil
     }
 }

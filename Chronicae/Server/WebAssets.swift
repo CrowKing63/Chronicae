@@ -63,6 +63,21 @@ enum WebAssets {
                     </div>
                 </section>
             </main>
+            <div id=\"tokenPrompt\" class=\"modal hidden\">
+                <div class=\"modal__card\">
+                    <h2>접속 토큰이 필요합니다</h2>
+                    <p class=\"description\">iCloud Drive의 <code>Chronicae/token.json</code> 파일에서 <code>token</code> 값을 복사해 아래에 붙여넣으세요.</p>
+                    <label class=\"field\">
+                        <span>토큰</span>
+                        <input id=\"tokenInput\" autocomplete=\"off\" placeholder=\"토큰을 입력하세요\" />
+                    </label>
+                    <div class=\"modal__actions\">
+                        <button id=\"tokenSubmit\" class=\"primary\">저장</button>
+                        <button id=\"tokenClear\" class=\"ghost\">취소</button>
+                    </div>
+                    <p id=\"tokenError\" class=\"status\"></p>
+                </div>
+            </div>
             <div id=\"toast\" role=\"status\" aria-live=\"polite\"></div>
             <script type=\"module\" src=\"/static/app.js\"></script>
         </body>
@@ -82,6 +97,7 @@ enum WebAssets {
           loadingProjects: false,
           loadingNotes: false,
           saving: false,
+          authToken: null,
         };
 
         const projectView = document.getElementById('projectView');
@@ -97,6 +113,11 @@ enum WebAssets {
         const saveButton = document.getElementById('saveNote');
         const saveStatus = document.getElementById('saveStatus');
         const toast = document.getElementById('toast');
+        const tokenPrompt = document.getElementById('tokenPrompt');
+        const tokenInput = document.getElementById('tokenInput');
+        const tokenSubmit = document.getElementById('tokenSubmit');
+        const tokenClear = document.getElementById('tokenClear');
+        const tokenError = document.getElementById('tokenError');
 
         document.getElementById('refreshProjects').addEventListener('click', () => {
           loadProjects(true);
@@ -118,12 +139,30 @@ enum WebAssets {
           state.draftContent = event.target.value;
           updateSaveAvailability();
         });
+        tokenSubmit.addEventListener('click', () => {
+          handleTokenSubmit();
+        });
+        tokenClear.addEventListener('click', () => {
+          setToken(null);
+          tokenError.textContent = '';
+          tokenInput.value = '';
+          tokenInput.focus();
+        });
+        tokenInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            handleTokenSubmit();
+          }
+        });
 
         async function loadProjects(force = false) {
           if (state.loadingProjects && !force) return;
+          if (!ensureToken()) {
+            projectStatus.textContent = '토큰을 입력하면 프로젝트 목록을 불러옵니다.';
+            return;
+          }
           setProjectLoading(true);
           try {
-            const response = await fetch('/api/projects');
+            const response = await authorizedFetch('/api/projects');
             if (!response.ok) throw new Error('프로젝트 목록을 불러오지 못했습니다.');
             const data = await response.json();
             state.projects = Array.isArray(data.items) ? data.items : [];
@@ -134,8 +173,14 @@ enum WebAssets {
               projectStatus.textContent = '';
             }
           } catch (error) {
-            console.error(error);
-            projectStatus.textContent = '저장소 목록을 불러오지 못했습니다. 네트워크 연결을 확인하고 다시 시도하세요.';
+            if (error.code === 'token_required') {
+              projectStatus.textContent = '토큰을 입력하면 프로젝트 목록을 불러옵니다.';
+            } else if (error.code === 'token_invalid') {
+              projectStatus.textContent = '토큰이 유효하지 않습니다. 새 토큰을 입력하세요.';
+            } else {
+              console.error(error);
+              projectStatus.textContent = '저장소 목록을 불러오지 못했습니다. 네트워크 연결을 확인하고 다시 시도하세요.';
+            }
           } finally {
             setProjectLoading(false);
           }
@@ -174,7 +219,7 @@ enum WebAssets {
           if (!state.selectedProject) return;
           setNoteLoading(true);
           try {
-            const response = await fetch(`/api/projects/${state.selectedProject.id}/notes`);
+            const response = await authorizedFetch(`/api/projects/${state.selectedProject.id}/notes`);
             if (!response.ok) throw new Error('메모를 불러오지 못했습니다.');
             const data = await response.json();
             state.notes = Array.isArray(data.items) ? data.items : [];
@@ -188,8 +233,14 @@ enum WebAssets {
               renderEditorFields();
             }
           } catch (error) {
-            console.error(error);
-            noteStatus.textContent = '메모를 불러오지 못했습니다. 잠시 후 다시 시도하세요.';
+            if (error.code === 'token_required') {
+              noteStatus.textContent = '토큰을 입력하면 메모를 불러올 수 있습니다.';
+            } else if (error.code === 'token_invalid') {
+              noteStatus.textContent = '토큰이 유효하지 않습니다. 새 토큰을 입력해 주세요.';
+            } else {
+              console.error(error);
+              noteStatus.textContent = '메모를 불러오지 못했습니다. 잠시 후 다시 시도하세요.';
+            }
           } finally {
             setNoteLoading(false);
           }
@@ -245,6 +296,10 @@ enum WebAssets {
 
         async function saveCurrentNote() {
           if (!state.selectedProject || !state.selectedNoteId) return;
+          if (!ensureToken()) {
+            saveStatus.textContent = '토큰을 입력하면 저장할 수 있습니다.';
+            return;
+          }
           setSaving(true);
           saveStatus.textContent = '저장 중...';
           try {
@@ -254,7 +309,7 @@ enum WebAssets {
               content: state.draftContent,
               tags: note?.tags ?? [],
             };
-            const response = await fetch(`/api/projects/${state.selectedProject.id}/notes/${state.selectedNoteId}`, {
+            const response = await authorizedFetch(`/api/projects/${state.selectedProject.id}/notes/${state.selectedNoteId}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
@@ -270,9 +325,15 @@ enum WebAssets {
             saveStatus.textContent = '저장되었습니다.';
             showToast('메모가 저장되었습니다.');
           } catch (error) {
-            console.error(error);
-            saveStatus.textContent = '저장에 실패했습니다. 다시 시도하세요.';
-            showToast('저장에 실패했습니다.', true);
+            if (error.code === 'token_required') {
+              saveStatus.textContent = '토큰을 입력하면 저장할 수 있습니다.';
+            } else if (error.code === 'token_invalid') {
+              saveStatus.textContent = '토큰이 유효하지 않습니다. 새 토큰을 입력해 주세요.';
+            } else {
+              console.error(error);
+              saveStatus.textContent = '저장에 실패했습니다. 다시 시도하세요.';
+              showToast('저장에 실패했습니다.', true);
+            }
           } finally {
             setSaving(false);
           }
@@ -280,10 +341,14 @@ enum WebAssets {
 
         async function createNote() {
           if (!state.selectedProject) return;
+          if (!ensureToken()) {
+            saveStatus.textContent = '토큰을 입력하면 새 메모를 만들 수 있습니다.';
+            return;
+          }
           setSaving(true);
           saveStatus.textContent = '새 메모를 만드는 중...';
           try {
-            const response = await fetch(`/api/projects/${state.selectedProject.id}/notes`, {
+            const response = await authorizedFetch(`/api/projects/${state.selectedProject.id}/notes`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ title: '새 메모', content: '', tags: [] }),
@@ -297,9 +362,15 @@ enum WebAssets {
             saveStatus.textContent = '새 메모가 생성되었습니다.';
             showToast('새 메모가 생성되었습니다.');
           } catch (error) {
-            console.error(error);
-            saveStatus.textContent = '새 메모를 만들지 못했습니다. 다시 시도하세요.';
-            showToast('새 메모 생성에 실패했습니다.', true);
+            if (error.code === 'token_required') {
+              saveStatus.textContent = '토큰을 입력하면 새 메모를 만들 수 있습니다.';
+            } else if (error.code === 'token_invalid') {
+              saveStatus.textContent = '토큰이 유효하지 않습니다. 새 토큰을 입력하세요.';
+            } else {
+              console.error(error);
+              saveStatus.textContent = '새 메모를 만들지 못했습니다. 다시 시도하세요.';
+              showToast('새 메모 생성에 실패했습니다.', true);
+            }
           } finally {
             setSaving(false);
           }
@@ -349,6 +420,79 @@ enum WebAssets {
           saveButton.disabled = state.saving || !state.selectedNoteId;
         }
 
+        function restoreToken() {
+          const stored = window.localStorage.getItem('chronicae.token');
+          if (stored) {
+            state.authToken = stored;
+          }
+        }
+
+        function setToken(token) {
+          state.authToken = token;
+          if (token) {
+            window.localStorage.setItem('chronicae.token', token);
+          } else {
+            window.localStorage.removeItem('chronicae.token');
+          }
+        }
+
+        function ensureToken() {
+          if (state.authToken) return true;
+          restoreToken();
+          if (state.authToken) return true;
+          showTokenPrompt();
+          return false;
+        }
+
+        async function authorizedFetch(path, options = {}) {
+          if (!ensureToken()) {
+            const error = new Error('token_required');
+            error.code = 'token_required';
+            throw error;
+          }
+          const opts = { ...options };
+          const headers = new Headers(options.headers || {});
+          headers.set('Authorization', `Bearer ${state.authToken}`);
+          if (!headers.has('Accept')) {
+            headers.set('Accept', 'application/json');
+          }
+          opts.headers = headers;
+          const response = await fetch(path, opts);
+          if (response.status === 401) {
+            setToken(null);
+            const error = new Error('token_invalid');
+            error.code = 'token_invalid';
+            showTokenPrompt('토큰이 만료되었거나 잘못되었습니다. 새 토큰을 입력하세요.');
+            throw error;
+          }
+          return response;
+        }
+
+        function showTokenPrompt(message = '') {
+          tokenPrompt.classList.remove('hidden');
+          tokenError.textContent = message;
+          tokenInput.focus();
+        }
+
+        function hideTokenPrompt() {
+          tokenPrompt.classList.add('hidden');
+          tokenError.textContent = '';
+          tokenInput.value = '';
+        }
+
+        function handleTokenSubmit() {
+          const value = tokenInput.value.trim();
+          if (!value) {
+            tokenError.textContent = '토큰을 입력하세요.';
+            tokenInput.focus();
+            return;
+          }
+          setToken(value);
+          hideTokenPrompt();
+          projectStatus.textContent = '';
+          loadProjects(true);
+        }
+
         function formatTimestamp(timestamp) {
           if (!timestamp) return '';
           try {
@@ -377,6 +521,7 @@ enum WebAssets {
           toast.dataset.timerId = String(timeoutId);
         }
 
+        restoreToken();
         loadProjects();
         showProjectView();
         renderEditorFields();
@@ -406,6 +551,39 @@ enum WebAssets {
             background: radial-gradient(circle at top left, rgba(76, 126, 255, 0.18), transparent 55%),
                         radial-gradient(circle at bottom right, rgba(104, 216, 255, 0.2), transparent 50%),
                         #05060b;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 6, 11, 0.72);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            z-index: 1000;
+        }
+
+        .modal__card {
+            width: min(480px, 100%);
+            background: rgba(14, 16, 28, 0.95);
+            color: #e7ecff;
+            padding: 24px;
+            border-radius: 18px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .modal__actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
         }
 
         a {
