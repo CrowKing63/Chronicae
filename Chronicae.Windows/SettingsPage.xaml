@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Chronicae.Windows.SettingsPage"
+             Title="Settings">
+    <ScrollView>
+        <StackLayout Padding="20" Spacing="10">
+            <Label Text="Settings" 
+                   FontSize="24" 
+                   FontAttributes="Bold" 
+                   HorizontalOptions="Center" />
+            
+            <Label Text="Server Configuration" 
+                   FontSize="18" 
+                   FontAttributes="Bold" 
+                   Margin="0,20,0,10" />
+            
+            <Label Text="Server Port" />
+            <Entry x:Name="PortEntry" 
+                   Text="5000" 
+                   Placeholder="Enter server port" />
+            
+            <StackLayout Orientation="Horizontal" Spacing="10">
+                <Label Text="Enable External Access" 
+                       VerticalOptions="Center" />
+                <Switch x:Name="ExternalAccessSwitch" />
+            </StackLayout>
+            
+            <Button Text="Save Settings" 
+                    Clicked="OnSaveSettingsClicked"
+                    BackgroundColor="Blue"
+                    TextColor="White" />
+            
+            <Label Text="Application Information" 
+                   FontSize="18" 
+                   FontAttributes="Bold" 
+                   Margin="0,20,0,10" />
+            
+            <Label Text="Version" />
+            <Label x:Name="VersionLabel" Text="1.0.0" />
+            
+            <Label Text="Data Directory" />
+            <Label x:Name="DataDirectoryLabel" 
+                   Text="C:\Users\[User]\AppData\Local\Chronicae" 
+                   MaxLines="2"
+                   LineBreakMode="WordWrap" />
+            
+            <Button Text="Open Data Directory" 
+                    Clicked="OnOpenDataDirectoryClicked"
+                    BackgroundColor="Green"
+                    TextColor="White"
+                    Margin="0,10,0,0" />
+        </StackLayout>
+    </ScrollView>
+</ContentPage>

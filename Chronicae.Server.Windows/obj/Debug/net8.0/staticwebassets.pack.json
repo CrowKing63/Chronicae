@@ -1,0 +1,25 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\Users\\UITAEK\\Development\\Chronicae\\Chronicae.Server.Windows\\wwwroot\\web-app\\index.html",
+      "PackagePath": "staticwebassets\\web-app\\index.html"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.Chronicae.Server.Windows.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.build.Chronicae.Server.Windows.props",
+      "PackagePath": "build\\Chronicae.Server.Windows.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildMultiTargeting.Chronicae.Server.Windows.props",
+      "PackagePath": "buildMultiTargeting\\Chronicae.Server.Windows.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildTransitive.Chronicae.Server.Windows.props",
+      "PackagePath": "buildTransitive\\Chronicae.Server.Windows.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

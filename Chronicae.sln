@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicae.Windows", "Chroni
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicae.Server.Windows", "Chronicae.Server.Windows\Chronicae.Server.Windows.csproj", "{048FD091-718E-489C-8D32-5AA42AD6F4CF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chronicae.Server.Windows.Tests", "Chronicae.Server.Windows.Tests\Chronicae.Server.Windows.Tests.csproj", "{8C116C5D-8321-48C7-92D4-9A85F62A73A8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

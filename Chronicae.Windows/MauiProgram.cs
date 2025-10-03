@@ -19,6 +19,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<ApiClient>();
         builder.Services.AddSingleton<SseClient>();
         builder.Services.AddSingleton<MainPage>();
+        builder.Services.AddSingleton<ISystemTrayService, SystemTrayService>();
 
 #if DEBUG
 		builder.Logging.AddDebug();

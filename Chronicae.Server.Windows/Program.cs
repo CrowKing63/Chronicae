@@ -4,6 +4,7 @@ using Chronicae.Server.Windows.Models;
 using Chronicae.Server.Windows.Services;
 using Microsoft.AspNetCore.Mvc; // Added for [FromQuery]
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,11 +26,37 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-#region Status Endpoints
-app.MapGet("/api/status", (ChronicaeDbContext db) =>
+// Serve static files from wwwroot folder
+app.UseStaticFiles();
+
+// Serve static files from a specific folder for the Vision SPA
+app.UseStaticFiles(new StaticFileOptions
 {
-    //TODO: get real data from db
-    var status = new SystemStatus(1234, "default-project-id", 5, 512, 1337);
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "web-app")),
+    RequestPath = "/web-app"
+});
+
+#region Status Endpoints
+app.MapGet("/api/status", async (ChronicaeDbContext db) =>
+{
+    var uptime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(); // 실제 uptime 계산
+    var projectsCount = await db.Projects.CountAsync();
+    var notesCount = await db.Notes.CountAsync();
+    var versionsCount = await db.VersionSnapshots.CountAsync();
+    
+    // 가장 최근에 업데이트된 프로젝트 ID 가져오기 (있을 경우)
+    string? currentProjectId = null;
+    if (projectsCount > 0)
+    {
+        var recentProject = await db.Projects
+            .OrderByDescending(p => p.UpdatedAt)
+            .Select(p => p.Id)
+            .FirstOrDefaultAsync();
+        currentProjectId = recentProject;
+    }
+    
+    var status = new SystemStatus(uptime, currentProjectId, projectsCount, notesCount, versionsCount);
     return status;
 })
 .WithName("GetStatus")
@@ -294,10 +321,17 @@ app.MapDelete("/api/projects/{projectId}/notes/{noteId}", async (string projectI
 {
     if (await db.Notes.FindAsync(noteId) is Note note && note.ProjectId == projectId)
     {
+        // If purgeVersions is true, also delete associated version snapshots
+        if (purgeVersions)
+        {
+            var versionSnapshots = await db.VersionSnapshots
+                .Where(vs => vs.NoteId == noteId)
+                .ToListAsync();
+            db.VersionSnapshots.RemoveRange(versionSnapshots);
+        }
+
         db.Notes.Remove(note);
         await db.SaveChangesAsync();
-
-        // TODO: Implement logic to purge versions if purgeVersions is true
 
         await sseService.BroadcastEvent(new SseEvent { Event = "note.deleted", Data = new { noteId, projectId } });
 
@@ -307,6 +341,28 @@ app.MapDelete("/api/projects/{projectId}/notes/{noteId}", async (string projectI
     return Results.NotFound();
 })
 .WithName("DeleteNote")
+.WithOpenApi();
+#endregion
+
+#region AI Endpoints
+app.MapPost("/api/ai/query", async (AiQueryRequest request, ChronicaeDbContext db, SseService sseService) =>
+{
+    // This is a basic implementation - in a real application, this would connect to an AI service
+    // For now, we'll return a simple mock response
+    
+    var response = new AiQueryResponse
+    {
+        Query = request.Query,
+        Response = $"This is a mock response for your query: '{request.Query}'. In a real implementation, this would connect to an AI service.",
+        Timestamp = DateTimeOffset.UtcNow
+    };
+
+    // Broadcast the response via SSE
+    await sseService.BroadcastEvent(new SseEvent { Event = "ai.response", Data = response });
+
+    return Results.Ok(response);
+})
+.WithName("QueryAI")
 .WithOpenApi();
 #endregion
 

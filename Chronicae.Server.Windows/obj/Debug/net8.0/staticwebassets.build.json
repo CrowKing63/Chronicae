@@ -1,11 +1,39 @@
 {
   "Version": 1,
-  "Hash": "5c4TVJ9PdhLDDYlDJwr7Za2CULwiX4JHLtQBre0mjbA=",
+  "Hash": "gD8hPRiDzReqCaBW9K2ufn/U4IcqvWUtsWFCgHrm9Ws=",
   "Source": "Chronicae.Server.Windows",
   "BasePath": "_content/Chronicae.Server.Windows",
   "Mode": "Default",
   "ManifestType": "Build",
   "ReferencedProjectsConfiguration": [],
-  "DiscoveryPatterns": [],
-  "Assets": []
+  "DiscoveryPatterns": [
+    {
+      "Name": "Chronicae.Server.Windows\\wwwroot",
+      "Source": "Chronicae.Server.Windows",
+      "ContentRoot": "C:\\Users\\UITAEK\\Development\\Chronicae\\Chronicae.Server.Windows\\wwwroot\\",
+      "BasePath": "_content/Chronicae.Server.Windows",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "C:\\Users\\UITAEK\\Development\\Chronicae\\Chronicae.Server.Windows\\wwwroot\\web-app\\index.html",
+      "SourceId": "Chronicae.Server.Windows",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\UITAEK\\Development\\Chronicae\\Chronicae.Server.Windows\\wwwroot\\",
+      "BasePath": "_content/Chronicae.Server.Windows",
+      "RelativePath": "web-app/index.html",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\web-app\\index.html"
+    }
+  ]
 }

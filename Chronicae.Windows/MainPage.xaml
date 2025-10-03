@@ -73,6 +73,12 @@
             <Button Text="Delete Note" Clicked="OnDeleteNoteClicked" IsEnabled="{Binding IsNoteSelected}" />
         </HorizontalStackLayout>
 
+        <Button Text="Settings" 
+                Clicked="OnSettingsClicked" 
+                BackgroundColor="Gray" 
+                TextColor="White"
+                Margin="0,20,0,0" />
+
     </VerticalStackLayout>
 
 </ContentPage>
