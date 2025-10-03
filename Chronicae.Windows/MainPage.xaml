@@ -35,6 +35,15 @@
             </ListView.ItemTemplate>
         </ListView>
 
+        <Entry Placeholder="New Project Name" Text="{Binding NewProjectName}" Margin="0,20,0,0" />
+        <Button Text="Create Project" Clicked="OnCreateProjectClicked" />
+
+        <Entry Placeholder="Edit Project Name" Text="{Binding SelectedProject.Name}" IsEnabled="{Binding IsProjectSelected}" Margin="0,20,0,0" />
+        <HorizontalStackLayout Spacing="10">
+            <Button Text="Edit Project" Clicked="OnEditProjectClicked" IsEnabled="{Binding IsProjectSelected}" />
+            <Button Text="Delete Project" Clicked="OnDeleteProjectClicked" IsEnabled="{Binding IsProjectSelected}" />
+        </HorizontalStackLayout>
+
         <Label
             x:Name="SelectedProjectLabel"
             Text="Selected Project: None"
@@ -43,7 +52,8 @@
 
         <ListView x:Name="NotesListView"
                   ItemsSource="{Binding Notes}"
-                  HeightRequest="200">
+                  HeightRequest="200"
+                  ItemSelected="OnNoteSelected">
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="models:Note">
                     <TextCell Text="{Binding Title}" Detail="{Binding Excerpt}" />
@@ -51,12 +61,17 @@
             </ListView.ItemTemplate>
         </ListView>
 
-        <Entry Placeholder="New Project Name" Text="{Binding NewProjectName}" Margin="0,20,0,0" />
-        <Button Text="Create Project" Clicked="OnCreateProjectClicked" />
-
         <Entry Placeholder="New Note Title" Text="{Binding NewNoteTitle}" Margin="0,20,0,0" />
         <Entry Placeholder="New Note Excerpt" Text="{Binding NewNoteExcerpt}" />
         <Button Text="Create Note" Clicked="OnCreateNoteClicked" IsEnabled="{Binding IsProjectSelected}" />
+
+        <Entry Placeholder="Edit Note Title" Text="{Binding SelectedNote.Title}" IsEnabled="{Binding IsNoteSelected}" Margin="0,20,0,0" />
+        <Entry Placeholder="Edit Note Excerpt" Text="{Binding SelectedNote.Excerpt}" IsEnabled="{Binding IsNoteSelected}" />
+        <Editor Placeholder="Edit Note Content" Text="{Binding SelectedNote.Content}" IsEnabled="{Binding IsNoteSelected}" HeightRequest="100" />
+        <HorizontalStackLayout Spacing="10">
+            <Button Text="Edit Note" Clicked="OnEditNoteClicked" IsEnabled="{Binding IsNoteSelected}" />
+            <Button Text="Delete Note" Clicked="OnDeleteNoteClicked" IsEnabled="{Binding IsNoteSelected}" />
+        </HorizontalStackLayout>
 
     </VerticalStackLayout>
 

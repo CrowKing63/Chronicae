@@ -1,4 +1,3 @@
-
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Chronicae.Windows.Models;
@@ -60,6 +59,42 @@ public partial class MainPage : ContentPage
         {
             if (_isProjectSelected == value) return;
             _isProjectSelected = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private bool _isNoteSelected;
+    public bool IsNoteSelected
+    {
+        get => _isNoteSelected;
+        set
+        {
+            if (_isNoteSelected == value) return;
+            _isNoteSelected = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private Project? _selectedProject;
+    public Project? SelectedProject
+    {
+        get => _selectedProject;
+        set
+        {
+            if (_selectedProject == value) return;
+            _selectedProject = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private Note? _selectedNote;
+    public Note? SelectedNote
+    {
+        get => _selectedNote;
+        set
+        {
+            if (_selectedNote == value) return;
+            _selectedNote = value;
             OnPropertyChanged();
         }
     }
@@ -130,6 +165,9 @@ public partial class MainPage : ContentPage
         Projects.Clear();
         Notes.Clear();
         IsProjectSelected = false;
+        IsNoteSelected = false;
+        SelectedProject = null;
+        SelectedNote = null;
         SelectedProjectLabel.Text = "Selected Project: None";
     }
 
@@ -138,14 +176,31 @@ public partial class MainPage : ContentPage
         if (e.SelectedItem is not Project selectedProject)
         {
             IsProjectSelected = false; // Update property when no project is selected
+            SelectedProject = null;
+            SelectedNote = null;
+            IsNoteSelected = false;
             SelectedProjectLabel.Text = "Selected Project: None";
             Notes.Clear();
             return;
         }
 
+        SelectedProject = selectedProject;
         IsProjectSelected = true; // Update property when a project is selected
         SelectedProjectLabel.Text = $"Selected Project: {selectedProject.Name}";
         await LoadNotesAsync(selectedProject.Id);
+    }
+
+    private async void OnNoteSelected(object sender, SelectedItemChangedEventArgs e)
+    {
+        if (e.SelectedItem is not Note selectedNote)
+        {
+            IsNoteSelected = false;
+            SelectedNote = null;
+            return;
+        }
+
+        SelectedNote = selectedNote;
+        IsNoteSelected = true;
     }
 
     private async void OnCreateProjectClicked(object sender, EventArgs e)
@@ -170,9 +225,60 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private async void OnEditProjectClicked(object sender, EventArgs e)
+    {
+        if (SelectedProject is null)
+        {
+            await DisplayAlert("Error", "No project selected for editing.", "OK");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SelectedProject.Name))
+        {
+            await DisplayAlert("Error", "Project name cannot be empty.", "OK");
+            return;
+        }
+
+        var updated = await _apiClient.UpdateProjectAsync(SelectedProject);
+        if (updated)
+        {
+            await LoadProjectsAsync();
+        }
+        else
+        {
+            await DisplayAlert("Error", "Failed to update project.", "OK");
+        }
+    }
+
+    private async void OnDeleteProjectClicked(object sender, EventArgs e)
+    {
+        if (SelectedProject is null)
+        {
+            await DisplayAlert("Error", "No project selected for deletion.", "OK");
+            return;
+        }
+
+        var confirm = await DisplayAlert("Confirm", $"Are you sure you want to delete project '{SelectedProject.Name}'?", "Yes", "No");
+        if (!confirm) return;
+
+        var deleted = await _apiClient.DeleteProjectAsync(SelectedProject.Id);
+        if (deleted)
+        {
+            SelectedProject = null;
+            IsProjectSelected = false;
+            SelectedNote = null;
+            IsNoteSelected = false;
+            await LoadProjectsAsync();
+        }
+        else
+        {
+            await DisplayAlert("Error", "Failed to delete project.", "OK");
+        }
+    }
+
     private async void OnCreateNoteClicked(object sender, EventArgs e)
     {
-        if (ProjectsListView.SelectedItem is not Project selectedProject)
+        if (SelectedProject is null)
         {
             await DisplayAlert("Error", "Please select a project first.", "OK");
             return;
@@ -190,17 +296,66 @@ public partial class MainPage : ContentPage
             Excerpt = NewNoteExcerpt,
             Tags = new List<string>() // Initialize with empty list for now
         };
-        var createdNote = await _apiClient.CreateNoteAsync(selectedProject.Id, newNote);
+        var createdNote = await _apiClient.CreateNoteAsync(SelectedProject.Id, newNote);
 
         if (createdNote is not null)
         {
             NewNoteTitle = string.Empty; // Clear input
             NewNoteExcerpt = string.Empty; // Clear input
-            await LoadNotesAsync(selectedProject.Id);
+            await LoadNotesAsync(SelectedProject.Id);
         }
         else
         {
             await DisplayAlert("Error", "Failed to create note.", "OK");
+        }
+    }
+
+    private async void OnEditNoteClicked(object sender, EventArgs e)
+    {
+        if (SelectedNote is null || SelectedProject is null)
+        {
+            await DisplayAlert("Error", "No note selected for editing.", "OK");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SelectedNote.Title))
+        {
+            await DisplayAlert("Error", "Note title cannot be empty.", "OK");
+            return;
+        }
+
+        var updated = await _apiClient.UpdateNoteAsync(SelectedProject.Id, SelectedNote);
+        if (updated)
+        {
+            await LoadNotesAsync(SelectedProject.Id);
+        }
+        else
+        {
+            await DisplayAlert("Error", "Failed to update note.", "OK");
+        }
+    }
+
+    private async void OnDeleteNoteClicked(object sender, EventArgs e)
+    {
+        if (SelectedNote is null || SelectedProject is null)
+        {
+            await DisplayAlert("Error", "No note selected for deletion.", "OK");
+            return;
+        }
+
+        var confirm = await DisplayAlert("Confirm", $"Are you sure you want to delete note '{SelectedNote.Title}'?", "Yes", "No");
+        if (!confirm) return;
+
+        var deleted = await _apiClient.DeleteNoteAsync(SelectedProject.Id, SelectedNote.Id);
+        if (deleted)
+        {
+            SelectedNote = null;
+            IsNoteSelected = false;
+            await LoadNotesAsync(SelectedProject.Id);
+        }
+        else
+        {
+            await DisplayAlert("Error", "Failed to delete note.", "OK");
         }
     }
 

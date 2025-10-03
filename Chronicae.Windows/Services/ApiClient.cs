@@ -69,6 +69,36 @@ public class ApiClient
         }
     }
 
+    public async Task<bool> UpdateProjectAsync(Project project)
+    {
+        try
+        {
+            var response = await _httpClient.PutAsJsonAsync($"projects/{project.Id}", project);
+            response.EnsureSuccessStatusCode();
+            return true;
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Error updating project: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<bool> DeleteProjectAsync(string projectId)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"projects/{projectId}");
+            response.EnsureSuccessStatusCode();
+            return true;
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Error deleting project: {ex.Message}");
+            return false;
+        }
+    }
+
     public async Task<Note?> CreateNoteAsync(string projectId, Note note)
     {
         try
@@ -81,6 +111,36 @@ public class ApiClient
         {
             Console.WriteLine($"Error creating note: {ex.Message}");
             return null;
+        }
+    }
+
+    public async Task<bool> UpdateNoteAsync(string projectId, Note note)
+    {
+        try
+        {
+            var response = await _httpClient.PutAsJsonAsync($"projects/{projectId}/notes/{note.Id}", note);
+            response.EnsureSuccessStatusCode();
+            return true;
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Error updating note: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<bool> DeleteNoteAsync(string projectId, string noteId)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"projects/{projectId}/notes/{noteId}");
+            response.EnsureSuccessStatusCode();
+            return true;
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Error deleting note: {ex.Message}");
+            return false;
         }
     }
 }

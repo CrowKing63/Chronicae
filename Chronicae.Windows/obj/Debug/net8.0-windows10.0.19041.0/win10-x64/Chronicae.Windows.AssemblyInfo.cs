@@ -17,7 +17,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Chronicae.Windows")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0+6bb4a690dbf306ec55aa70a9fb2dd82ee808841f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0+607abed59b62911d960a9bd2fe0f5c6887b94c74")]
 [assembly: System.Reflection.AssemblyProductAttribute("Chronicae.Windows")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Chronicae.Windows")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

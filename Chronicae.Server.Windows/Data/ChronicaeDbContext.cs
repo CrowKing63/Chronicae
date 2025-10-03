@@ -1,4 +1,3 @@
-
 using Chronicae.Server.Windows.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -13,6 +12,7 @@ public class ChronicaeDbContext : DbContext
 
     public DbSet<Project> Projects { get; set; }
     public DbSet<Note> Notes { get; set; }
+    public DbSet<VersionSnapshot> VersionSnapshots { get; set; } // Added DbSet for VersionSnapshot
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

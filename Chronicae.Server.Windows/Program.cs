@@ -1,3 +1,4 @@
+
 using Chronicae.Server.Windows.Data;
 using Chronicae.Server.Windows.Models;
 using Chronicae.Server.Windows.Services;
@@ -135,6 +136,7 @@ app.MapDelete("/api/projects/{id}", async (string id, ChronicaeDbContext db, Sse
 #endregion
 
 #region Note Endpoints
+
 app.MapGet("/api/projects/{projectId}/notes", async (string projectId, ChronicaeDbContext db) =>
 {
     return await db.Notes.Where(n => n.ProjectId == projectId).ToListAsync();
@@ -152,6 +154,72 @@ app.MapGet("/api/projects/{projectId}/notes/{noteId}", async (string projectId, 
 .WithName("GetNoteById")
 .WithOpenApi();
 
+app.MapGet("/api/projects/{projectId}/notes/{noteId}/versions", async (string projectId, string noteId, ChronicaeDbContext db) =>
+{
+    var noteExists = await db.Notes.AnyAsync(n => n.Id == noteId && n.ProjectId == projectId);
+    if (!noteExists) return Results.NotFound();
+
+    var versions = await db.VersionSnapshots
+        .Where(vs => vs.NoteId == noteId)
+        .OrderByDescending(vs => vs.VersionNumber)
+        .Select(vs => new VersionSummary { VersionNumber = vs.VersionNumber, CreatedAt = vs.CreatedAt })
+        .ToListAsync();
+
+    return Results.Ok(versions);
+})
+.WithName("GetNoteVersions")
+.WithOpenApi();
+
+app.MapGet("/api/projects/{projectId}/notes/{noteId}/versions/{versionNumber}", async (string projectId, string noteId, int versionNumber, ChronicaeDbContext db) =>
+{
+    var noteExists = await db.Notes.AnyAsync(n => n.Id == noteId && n.ProjectId == projectId);
+    if (!noteExists) return Results.NotFound();
+
+    var versionSnapshot = await db.VersionSnapshots
+        .FirstOrDefaultAsync(vs => vs.NoteId == noteId && vs.VersionNumber == versionNumber);
+
+    return versionSnapshot is not null
+        ? Results.Ok(new { versionSnapshot.Content, versionSnapshot.CreatedAt })
+        : Results.NotFound();
+})
+.WithName("GetSpecificNoteVersion")
+.WithOpenApi();
+
+app.MapPost("/api/projects/{projectId}/notes/{noteId}/versions/{versionNumber}:restore", async (string projectId, string noteId, int versionNumber, ChronicaeDbContext db, SseService sseService) =>
+{
+    var note = await db.Notes.FindAsync(noteId);
+    if (note is null || note.ProjectId != projectId) return Results.NotFound();
+
+    var versionSnapshot = await db.VersionSnapshots
+        .FirstOrDefaultAsync(vs => vs.NoteId == noteId && vs.VersionNumber == versionNumber);
+
+    if (versionSnapshot is null) return Results.NotFound();
+
+    // Restore content and update note properties
+    note.Content = versionSnapshot.Content;
+    note.UpdatedAt = DateTimeOffset.UtcNow;
+    note.Version++; // Increment version after restore
+
+    // Create a new version snapshot for the restored version
+    var newSnapshot = new VersionSnapshot
+    {
+        Id = Guid.NewGuid().ToString(),
+        NoteId = note.Id,
+        Content = note.Content,
+        CreatedAt = note.UpdatedAt,
+        VersionNumber = note.Version
+    };
+    db.VersionSnapshots.Add(newSnapshot);
+
+    await db.SaveChangesAsync();
+
+    await sseService.BroadcastEvent(new SseEvent { Event = "note.updated", Data = note });
+
+    return Results.Ok(note);
+})
+.WithName("RestoreNoteVersion")
+.WithOpenApi();
+
 app.MapPost("/api/projects/{projectId}/notes", async (string projectId, Note inputNote, ChronicaeDbContext db, SseService sseService) =>
 {
     var note = new Note
@@ -163,11 +231,23 @@ app.MapPost("/api/projects/{projectId}/notes", async (string projectId, Note inp
         CreatedAt = DateTimeOffset.UtcNow,
         UpdatedAt = DateTimeOffset.UtcNow,
         Excerpt = inputNote.Excerpt,
-        Content = inputNote.Content, // Update Content
+        Content = inputNote.Content,
         Version = 1 // Initial version
     };
 
     db.Notes.Add(note);
+
+    // Create initial version snapshot
+    var initialSnapshot = new VersionSnapshot
+    {
+        Id = Guid.NewGuid().ToString(),
+        NoteId = note.Id,
+        Content = note.Content,
+        CreatedAt = note.CreatedAt,
+        VersionNumber = note.Version
+    };
+    db.VersionSnapshots.Add(initialSnapshot);
+
     await db.SaveChangesAsync();
 
     await sseService.BroadcastEvent(new SseEvent { Event = "note.created", Data = note });
@@ -189,6 +269,17 @@ app.MapPut("/api/projects/{projectId}/notes/{noteId}", async (string projectId, 
     note.Content = inputNote.Content; // Update Content
     note.UpdatedAt = DateTimeOffset.UtcNow; // Update timestamp
     note.Version++; // Increment version
+
+    // Create a new version snapshot
+    var newSnapshot = new VersionSnapshot
+    {
+        Id = Guid.NewGuid().ToString(),
+        NoteId = note.Id,
+        Content = note.Content,
+        CreatedAt = note.UpdatedAt,
+        VersionNumber = note.Version
+    };
+    db.VersionSnapshots.Add(newSnapshot);
 
     await db.SaveChangesAsync();
 
