@@ -178,3 +178,4 @@ C:\Users\UITAEK\Development\Chronicae\Chronicae.Windows\obj\Debug\net8.0-windows
 C:\Users\UITAEK\Development\Chronicae\Chronicae.Windows\obj\Debug\net8.0-windows10.0.19041.0\win10-x64\qualifiers.txt.intermediate
 C:\Users\UITAEK\Development\Chronicae\Chronicae.Windows\obj\Debug\net8.0-windows10.0.19041.0\win10-x64\MultipleQualifiersPerDimensionFound.txt
 C:\Users\UITAEK\Development\Chronicae\Chronicae.Windows\obj\Debug\net8.0-windows10.0.19041.0\win10-x64\ProjectArchitectures.txt
+C:\Users\UITAEK\Development\Chronicae\Chronicae.Windows\bin\Debug\net8.0-windows10.0.19041.0\win10-x64\Hardcodet.NotifyIcon.Wpf.dll

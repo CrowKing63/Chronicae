@@ -117,6 +117,30 @@ dotnet ef database update --project Chronicae.Server.Windows/
 
 The project includes API integration through the Web API endpoints. Unit tests and integration tests can be added using xUnit or NUnit as specified in the roadmap.
 
+## Network Access
+
+To access the server from other devices on the local network:
+
+1. **Start the server**: Run `Chronicae.Server.Windows` with the command `dotnet run`
+2. **Access from other devices**: Connect to `http://192.168.219.104:5000` (replace with your actual IP address)
+3. **Vision SPA**: Access the web-based note editor at `http://192.168.219.104:5000/web-app`
+
+### Firewall Configuration
+
+To allow external access on Windows, you need to open port 5000 in Windows Firewall:
+
+```
+netsh advfirewall firewall add rule name="Chronicae Server Port 5000" dir=in action=allow protocol=TCP localport=5000
+```
+
+This command requires administrator privileges. Run it in an administrator command prompt.
+
+### Network Access Notes
+
+- The server runs on HTTP only (port 5000) to avoid certificate warnings on local networks
+- No HTTPS/SSL encryption is used for local network access
+- For production use, configure proper SSL certificates
+
 ## Development Conventions
 
 - API-first approach: All features should implement server APIs first based on `docs/api-spec.md`

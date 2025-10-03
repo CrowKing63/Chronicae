@@ -18,6 +18,17 @@ builder.Services.AddDbContext<ChronicaeDbContext>(options => options.UseSqlite("
 builder.Services.AddMemoryCache(); // Add memory cache service
 builder.Services.AddSingleton<SseService>();
 
+// Add CORS for web app access
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowWebApp", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 // Add authentication services
 var jwtSettings = new JwtSettings
 {
@@ -34,6 +45,10 @@ builder.Services.AddSingleton<ApiKeyService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Configure Kestrel to listen on all interfaces (for external access)
+// Use only HTTP to avoid certificate warnings on local network
+builder.WebHost.UseUrls("http://0.0.0.0:5000");
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -43,10 +58,14 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Enable CORS (should be before other middleware that might write to response)
+app.UseCors("AllowWebApp");
+
 // Add API key middleware before other middleware
 app.UseMiddleware<ApiKeyMiddleware>();
 
-app.UseHttpsRedirection();
+// Use HTTP only (no HTTPS redirection) to avoid certificate warnings
+// app.UseHttpsRedirection();
 
 // Serve static files from wwwroot folder
 app.UseStaticFiles();
@@ -436,7 +455,7 @@ app.MapPost("/api/auth/generate-api-key", (GenerateApiKeyRequest request, ApiKey
     var apiKeyFromHeader = context.Items["ApiKey"] as ApiKey;
     if (apiKeyFromHeader != null && !apiKeyService.HasPermission(apiKeyFromHeader, "admin"))
     {
-        return Results.Forbidden();
+        return Results.StatusCode(403);
     }
 
     if (string.IsNullOrEmpty(request.Name))
@@ -482,7 +501,7 @@ app.MapGet("/api/search", async (ChronicaeDbContext db, [FromQuery] string query
 .WithName("SearchNotes")
 .WithOpenApi();
 
-app.MapGet("/api/projects/{projectId}/notes/tag-filter", async (ChronicaeDbContext db, string projectId, [FromQuery] List<string> tags) =>
+app.MapGet("/api/projects/{projectId}/notes/tag-filter", async (ChronicaeDbContext db, string projectId, [FromQuery] string[] tags) =>
 {
     var notesQuery = db.Notes.Where(n => n.ProjectId == projectId);
 
@@ -530,7 +549,7 @@ app.MapGet("/api/projects/{projectId}/export", async (ChronicaeDbContext db, str
                 txtContent += "---\n\n";
             }
             
-            return Results.Text(txtContent, "text/plain", "export.txt");
+            return Results.Text(txtContent, "text/plain");
         
         default:
             return Results.BadRequest("Unsupported format. Use 'json' or 'txt'.");
@@ -559,7 +578,7 @@ app.MapGet("/api/projects/{projectId}/notes/{noteId}/export", async (ChronicaeDb
             txtContent += $"Updated: {note.UpdatedAt}\n\n";
             txtContent += $"Content:\n{note.Content}\n";
             
-            return Results.Text(txtContent, "text/plain", $"note_{noteId}.txt");
+            return Results.Text(txtContent, "text/plain");
         
         default:
             return Results.BadRequest("Unsupported format. Use 'json' or 'txt'.");

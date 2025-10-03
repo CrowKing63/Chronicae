@@ -43,7 +43,7 @@
 		<PackageCertificateKeyFile>Chronicae_TemporaryKey.pfx</PackageCertificateKeyFile>
 		<PackageCertificatePassword>password</PackageCertificatePassword>
 		<UapAppxPackageBuildMode>StoreUpload</UapAppxPackageBuildMode>
-		<AppxPackageSigningEnabled>Auto</AppxPackageSigningEnabled>
+		<AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -8,8 +8,8 @@
     <TargetOsDescription>Windows 10.0</TargetOsDescription>
     <SolutionConfiguration>Debug|AnyCPU</SolutionConfiguration>
     <PackageArchitecture>x64</PackageArchitecture>
-    <PackageIdentityName>com.companyname.chronicae.windows</PackageIdentityName>
-    <PackageIdentityPublisher>CN=User Name</PackageIdentityPublisher>
+    <PackageIdentityName>Chronicae.NoteTakingApp</PackageIdentityName>
+    <PackageIdentityPublisher>CN=ChronicaeDeveloper</PackageIdentityPublisher>
     <IntermediateOutputPath>C:\Users\UITAEK\Development\Chronicae\Chronicae.Windows\obj\Debug\net8.0-windows10.0.19041.0\win10-x64\</IntermediateOutputPath>
     <RemoteDeploymentType>CopyToDevice</RemoteDeploymentType>
     <PackageRegistrationPath></PackageRegistrationPath>
@@ -222,6 +222,9 @@
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\UITAEK\.nuget\packages\microsoft.windows.sdk.net.ref\10.0.19041.56\lib\net8.0\WinRT.Runtime.dll">
       <PackagePath>WinRT.Runtime.dll</PackagePath>
+    </AppxPackagedFile>
+    <AppxPackagedFile Include="C:\Users\UITAEK\.nuget\packages\hardcodet.notifyicon.wpf\1.1.0\lib\net5.0-windows7.0\Hardcodet.NotifyIcon.Wpf.dll">
+      <PackagePath>Hardcodet.NotifyIcon.Wpf.dll</PackagePath>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\UITAEK\.nuget\packages\microsoft.extensions.configuration\8.0.0\lib\net8.0\Microsoft.Extensions.Configuration.dll">
       <PackagePath>Microsoft.Extensions.Configuration.dll</PackagePath>

@@ -1,30 +1,38 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" IgnorableNamespaces="uap rescap">
-  <Identity Name="com.companyname.chronicae.windows" Publisher="CN=User Name" Version="1.0.0.1" />
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10" IgnorableNamespaces="uap rescap mp desktop">
+  <Identity Name="Chronicae.NoteTakingApp" Publisher="CN=ChronicaeDeveloper" Version="1.0.0.0" ProcessorArchitecture="x64" />
   <mp:PhoneIdentity PhoneProductId="2982FB66-BA52-4DE3-A445-95BAA8838446" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
-    <DisplayName>Chronicae.Windows</DisplayName>
-    <PublisherDisplayName>User Name</PublisherDisplayName>
-    <Logo>appiconStoreLogo.png</Logo>
+    <DisplayName>Chronicae - Note Taking App</DisplayName>
+    <PublisherDisplayName>Chronicae Team</PublisherDisplayName>
+    <Description>A powerful note-taking application with version control and AI features</Description>
+    <Logo>Resources\Images\appicon.png</Logo>
   </Properties>
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
   </Dependencies>
   <Resources>
-    <Resource Language="x-generate" />
+    <Resource Language="en-us" />
   </Resources>
   <Applications>
-    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="$targetentrypoint$">
-      <uap:VisualElements DisplayName="Chronicae.Windows" Description="Chronicae.Windows" Square150x150Logo="appiconMediumTile.png" Square44x44Logo="appiconLogo.png" BackgroundColor="transparent">
-        <uap:DefaultTile Square71x71Logo="appiconSmallTile.png" Wide310x150Logo="appiconWideTile.png" Square310x310Logo="appiconLargeTile.png" ShortName="Chronicae.Windows">
+    <Application Id="Chronicae.Windows" Executable="Chronicae.Windows.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="Chronicae" Description="A powerful note-taking application" Square150x150Logo="Resources\Images\appicon.png" Square44x44Logo="Resources\Images\appicon.png" BackgroundColor="transparent">
+        <uap:DefaultTile Wide310x150Logo="Resources\Images\appicon.png" Square310x310Logo="Resources\Images\appicon.png" Square71x71Logo="Resources\Images\appicon.png" ShortName="Chronicae - Note Taking App">
           <uap:ShowNameOnTiles>
             <uap:ShowOn Tile="square150x150Logo" />
             <uap:ShowOn Tile="wide310x150Logo" />
           </uap:ShowNameOnTiles>
         </uap:DefaultTile>
-        <uap:SplashScreen Image="splashSplashScreen.png" />
+        <uap:SplashScreen Image="Resources\Images\appiconfg.png" />
       </uap:VisualElements>
+      <Extensions>
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="chronicae">
+            <uap:Logo>Resources\Images\appicon.png</uap:Logo>
+            <uap:DisplayName>Chronicae</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+      </Extensions>
     </Application>
   </Applications>
   <Capabilities>

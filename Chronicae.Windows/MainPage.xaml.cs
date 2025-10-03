@@ -105,12 +105,28 @@ public partial class MainPage : ContentPage
         _apiClient = apiClient;
         _sseClient = sseClient;
         BindingContext = this;
+        
+        // 앱 시작 시 자동으로 서버 시작 시도
+        Task.Run(async () => await AutoStartServerAsync());
+    }
+
+    private async Task AutoStartServerAsync()
+    {
+        // 딜레이를 주어 UI가 먼저 로드되도록 함
+        await Task.Delay(1000);
+        
+        // UI 스레드에서 작업 수행
+        Dispatcher.Dispatch(() =>
+        {
+            OnStartServerClicked(null, new EventArgs());
+        });
     }
 
     private async void OnStartServerClicked(object sender, EventArgs e)
     {
         if (_serverProcess is not null && !_serverProcess.HasExited)
         {
+            ServerStatusLabel.Text = "Server Status: Already Running";
             return; // Server is already running
         }
 
@@ -137,7 +153,7 @@ public partial class MainPage : ContentPage
         StopButton.IsEnabled = true;
 
         // Wait a bit for the server to start
-        await Task.Delay(2000);
+        await Task.Delay(3000);
 
         _sseClient.OnEventReceived += HandleSseEvent;
         _ = _sseClient.StartListeningAsync(); // Start listening without awaiting
@@ -413,5 +429,18 @@ public partial class MainPage : ContentPage
     private async void OnSettingsClicked(object sender, EventArgs e)
     {
         await Shell.Current.GoToAsync(nameof(SettingsPage));
+    }
+    
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        
+        // 앱 종료 시 서버 프로세스 종료
+        if (_serverProcess?.HasExited == false)
+        {
+            _serverProcess.Kill();
+            _serverProcess?.WaitForExit();
+            _serverProcess?.Dispose();
+        }
     }
 }

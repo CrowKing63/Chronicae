@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "CoyXZW0372Y=",
+  "dgSpecHash": "bIlgx+ZZgjo=",
   "success": true,
   "projectFilePath": "C:\\Users\\UITAEK\\Development\\Chronicae\\Chronicae.Windows\\Chronicae.Windows.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\UITAEK\\.nuget\\packages\\hardcodet.notifyicon.wpf\\1.1.0\\hardcodet.notifyicon.wpf.1.1.0.nupkg.sha512",
     "C:\\Users\\UITAEK\\.nuget\\packages\\microsoft.extensions.configuration\\8.0.0\\microsoft.extensions.configuration.8.0.0.nupkg.sha512",
     "C:\\Users\\UITAEK\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\8.0.0\\microsoft.extensions.configuration.abstractions.8.0.0.nupkg.sha512",
     "C:\\Users\\UITAEK\\.nuget\\packages\\microsoft.extensions.dependencyinjection\\8.0.1\\microsoft.extensions.dependencyinjection.8.0.1.nupkg.sha512",

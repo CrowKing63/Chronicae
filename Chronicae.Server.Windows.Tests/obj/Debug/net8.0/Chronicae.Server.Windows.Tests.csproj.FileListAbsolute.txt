@@ -157,3 +157,11 @@ C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\obj\Debug\n
 C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\obj\Debug\net8.0\Chronicae.Server.Windows.Tests.pdb
 C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\obj\Debug\net8.0\Chronicae.Server.Windows.Tests.genruntimeconfig.cache
 C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\obj\Debug\net8.0\ref\Chronicae.Server.Windows.Tests.dll
+C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\bin\Debug\net8.0\Microsoft.IdentityModel.Abstractions.dll
+C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\bin\Debug\net8.0\Microsoft.IdentityModel.JsonWebTokens.dll
+C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\bin\Debug\net8.0\Microsoft.IdentityModel.Logging.dll
+C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.dll
+C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\bin\Debug\net8.0\Microsoft.IdentityModel.Tokens.dll
+C:\Users\UITAEK\Development\Chronicae\Chronicae.Server.Windows.Tests\bin\Debug\net8.0\System.IdentityModel.Tokens.Jwt.dll
