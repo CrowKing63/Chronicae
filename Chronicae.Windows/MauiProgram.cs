@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
+using Chronicae.Windows.Services;
 
 namespace Chronicae.Windows;
 
@@ -14,6 +15,10 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
+
+        builder.Services.AddSingleton<ApiClient>();
+        builder.Services.AddSingleton<SseClient>();
+        builder.Services.AddSingleton<MainPage>();
 
 #if DEBUG
 		builder.Logging.AddDebug();

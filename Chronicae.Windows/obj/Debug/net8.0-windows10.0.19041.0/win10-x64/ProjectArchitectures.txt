@@ -1,0 +1,1 @@
+C:\Users\UITAEK\Development\Chronicae\Chronicae.Windows\Chronicae.Windows.csproj;x64
