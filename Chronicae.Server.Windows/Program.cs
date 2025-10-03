@@ -2,15 +2,34 @@
 using Chronicae.Server.Windows.Data;
 using Chronicae.Server.Windows.Models;
 using Chronicae.Server.Windows.Services;
+using Chronicae.Server.Windows.Middlewares;
 using Microsoft.AspNetCore.Mvc; // Added for [FromQuery]
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddDbContext<ChronicaeDbContext>(options => options.UseSqlite("Data Source=chronicae.db"));
+builder.Services.AddMemoryCache(); // Add memory cache service
 builder.Services.AddSingleton<SseService>();
+
+// Add authentication services
+var jwtSettings = new JwtSettings
+{
+    Secret = "THIS IS USED FOR DEVELOPMENT ONLY. CREATE A RANDOM SECRET FOR PRODUCTION!",
+    Issuer = "Chronicae.Server",
+    Audience = "Chronicae.Client",
+    ExpiryMinutes = 60
+};
+builder.Services.AddSingleton(jwtSettings);
+builder.Services.AddSingleton<TokenService>();
+builder.Services.AddSingleton<ApiKeyService>();
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -23,6 +42,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Add API key middleware before other middleware
+app.UseMiddleware<ApiKeyMiddleware>();
 
 app.UseHttpsRedirection();
 
@@ -83,9 +105,21 @@ app.MapGet("/api/events", async (HttpContext context, SseService sseService) =>
 #endregion
 
 #region Project Endpoints
-app.MapGet("/api/projects", async (ChronicaeDbContext db) =>
+app.MapGet("/api/projects", async (ChronicaeDbContext db, IMemoryCache cache) =>
 {
-    return await db.Projects.ToListAsync();
+    var cacheKey = "projects_list";
+    if (!cache.TryGetValue(cacheKey, out List<Project>? projects))
+    {
+        projects = await db.Projects.ToListAsync();
+        
+        var cacheOptions = new MemoryCacheEntryOptions()
+            .SetSlidingExpiration(TimeSpan.FromMinutes(5)) // 5분 동안 접근이 없으면 캐시 삭제
+            .SetAbsoluteExpiration(TimeSpan.FromMinutes(30)); // 최대 30분 동안 캐시 유지
+        
+        cache.Set(cacheKey, projects, cacheOptions);
+    }
+    
+    return projects;
 })
 .WithName("GetProjects")
 .WithOpenApi();
@@ -164,9 +198,21 @@ app.MapDelete("/api/projects/{id}", async (string id, ChronicaeDbContext db, Sse
 
 #region Note Endpoints
 
-app.MapGet("/api/projects/{projectId}/notes", async (string projectId, ChronicaeDbContext db) =>
+app.MapGet("/api/projects/{projectId}/notes", async (string projectId, ChronicaeDbContext db, IMemoryCache cache) =>
 {
-    return await db.Notes.Where(n => n.ProjectId == projectId).ToListAsync();
+    var cacheKey = $"notes_list_{projectId}";
+    if (!cache.TryGetValue(cacheKey, out List<Note>? notes))
+    {
+        notes = await db.Notes.Where(n => n.ProjectId == projectId).ToListAsync();
+        
+        var cacheOptions = new MemoryCacheEntryOptions()
+            .SetSlidingExpiration(TimeSpan.FromMinutes(5)) // 5분 동안 접근이 없으면 캐시 삭제
+            .SetAbsoluteExpiration(TimeSpan.FromMinutes(15)); // 최대 15분 동안 캐시 유지
+        
+        cache.Set(cacheKey, notes, cacheOptions);
+    }
+    
+    return notes;
 })
 .WithName("GetNotes")
 .WithOpenApi();
@@ -363,6 +409,163 @@ app.MapPost("/api/ai/query", async (AiQueryRequest request, ChronicaeDbContext d
     return Results.Ok(response);
 })
 .WithName("QueryAI")
+.WithOpenApi();
+#endregion
+
+#region Authentication Endpoints
+app.MapPost("/api/auth/login", (LoginRequest request, TokenService tokenService) =>
+{
+    // In a real application, validate credentials against a database
+    // For this example, we'll just validate that the credentials are not empty
+    if (string.IsNullOrEmpty(request.Username) || string.IsNullOrEmpty(request.Password))
+    {
+        return Results.Unauthorized();
+    }
+
+    // Generate JWT token
+    var token = tokenService.GenerateToken(request.Username, "user");
+    return Results.Ok(new { Token = token, ExpiresIn = 3600 }); // 1 hour
+})
+.WithName("Login")
+.WithOpenApi();
+
+app.MapPost("/api/auth/generate-api-key", (GenerateApiKeyRequest request, ApiKeyService apiKeyService, HttpContext context) =>
+{
+    // In a real application, validate that the user is authenticated
+    // Check if an API key was provided and validate permissions
+    var apiKeyFromHeader = context.Items["ApiKey"] as ApiKey;
+    if (apiKeyFromHeader != null && !apiKeyService.HasPermission(apiKeyFromHeader, "admin"))
+    {
+        return Results.Forbidden();
+    }
+
+    if (string.IsNullOrEmpty(request.Name))
+    {
+        return Results.BadRequest("API key name is required");
+    }
+
+    var newApiKey = apiKeyService.GenerateApiKey(request.Name, request.Permissions ?? "read,write");
+    return Results.Ok(new { Key = newApiKey, Message = "API key generated successfully" });
+})
+.WithName("GenerateApiKey")
+.WithOpenApi();
+
+app.MapGet("/api/search", async (ChronicaeDbContext db, [FromQuery] string query, [FromQuery] string? projectId = null, [FromQuery] string? tag = null) =>
+{
+    var notesQuery = db.Notes.AsQueryable();
+
+    // Apply project filter if specified
+    if (!string.IsNullOrEmpty(projectId))
+    {
+        notesQuery = notesQuery.Where(n => n.ProjectId == projectId);
+    }
+
+    // Apply tag filter if specified
+    if (!string.IsNullOrEmpty(tag))
+    {
+        notesQuery = notesQuery.Where(n => n.Tags.Contains(tag));
+    }
+
+    // Apply search query across title, content, and excerpt
+    if (!string.IsNullOrEmpty(query))
+    {
+        notesQuery = notesQuery.Where(n => 
+            n.Title.Contains(query) || 
+            n.Content.Contains(query) || 
+            n.Excerpt.Contains(query));
+    }
+
+    var results = await notesQuery.ToListAsync();
+
+    return Results.Ok(results);
+})
+.WithName("SearchNotes")
+.WithOpenApi();
+
+app.MapGet("/api/projects/{projectId}/notes/tag-filter", async (ChronicaeDbContext db, string projectId, [FromQuery] List<string> tags) =>
+{
+    var notesQuery = db.Notes.Where(n => n.ProjectId == projectId);
+
+    // Filter notes that contain any of the specified tags
+    foreach (var tag in tags)
+    {
+        notesQuery = notesQuery.Where(n => n.Tags.Contains(tag));
+    }
+
+    var results = await notesQuery.ToListAsync();
+    return Results.Ok(results);
+})
+.WithName("FilterNotesByTags")
+.WithOpenApi();
+
+app.MapGet("/api/projects/{projectId}/export", async (ChronicaeDbContext db, string projectId, [FromQuery] string format = "json") =>
+{
+    var project = await db.Projects.FindAsync(projectId);
+    if (project == null)
+    {
+        return Results.NotFound();
+    }
+
+    var notes = await db.Notes.Where(n => n.ProjectId == projectId).ToListAsync();
+
+    switch (format.ToLower())
+    {
+        case "json":
+            var projectData = new
+            {
+                Project = project,
+                Notes = notes
+            };
+            return Results.Json(projectData);
+        
+        case "txt":
+            var txtContent = $"Project: {project.Name}\n";
+            txtContent += $"Exported: {DateTimeOffset.UtcNow}\n\n";
+            
+            foreach (var note in notes)
+            {
+                txtContent += $"Title: {note.Title}\n";
+                txtContent += $"Tags: {string.Join(", ", note.Tags)}\n";
+                txtContent += $"Content:\n{note.Content}\n";
+                txtContent += "---\n\n";
+            }
+            
+            return Results.Text(txtContent, "text/plain", "export.txt");
+        
+        default:
+            return Results.BadRequest("Unsupported format. Use 'json' or 'txt'.");
+    }
+})
+.WithName("ExportProject")
+.WithOpenApi();
+
+app.MapGet("/api/projects/{projectId}/notes/{noteId}/export", async (ChronicaeDbContext db, string projectId, string noteId, [FromQuery] string format = "json") =>
+{
+    var note = await db.Notes.FindAsync(noteId);
+    if (note == null || note.ProjectId != projectId)
+    {
+        return Results.NotFound();
+    }
+
+    switch (format.ToLower())
+    {
+        case "json":
+            return Results.Json(note);
+        
+        case "txt":
+            var txtContent = $"Title: {note.Title}\n";
+            txtContent += $"Tags: {string.Join(", ", note.Tags)}\n";
+            txtContent += $"Created: {note.CreatedAt}\n";
+            txtContent += $"Updated: {note.UpdatedAt}\n\n";
+            txtContent += $"Content:\n{note.Content}\n";
+            
+            return Results.Text(txtContent, "text/plain", $"note_{noteId}.txt");
+        
+        default:
+            return Results.BadRequest("Unsupported format. Use 'json' or 'txt'.");
+    }
+})
+.WithName("ExportNote")
 .WithOpenApi();
 #endregion
 

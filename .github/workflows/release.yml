@@ -1,0 +1,66 @@
+name: Release Build and Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-package:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+        
+    - name: Restore dependencies
+      run: |
+        dotnet restore Chronicae.sln
+        
+    - name: Build Server
+      run: |
+        dotnet build Chronicae.Server.Windows/Chronicae.Server.Windows.csproj --configuration Release
+        
+    - name: Build Client
+      run: |
+        dotnet build Chronicae.Windows/Chronicae.Windows.csproj --configuration Release
+        
+    - name: Run Tests
+      run: |
+        dotnet test Chronicae.Server.Windows.Tests/Chronicae.Server.Windows.Tests.csproj --configuration Release --no-build --verbosity normal
+        
+    - name: Publish Client App (MSIX)
+      run: |
+        dotnet publish Chronicae.Windows/Chronicae.Windows.csproj -f net8.0-windows10.0.19041.0 -c Release -o ./publish --self-contained true /p:RuntimeIdentifier=win-x64 /p:GenerateAppxPackageOnBuild=true
+      env:
+        DOTNET_CLI_TELEMETRY_OPTOUT: 1
+        
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: chronicae-msix-package
+        path: ./publish/
+        
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./publish/
+        asset_name: chronicae-windows-app.zip
+        asset_content_type: application/zip

@@ -20,14 +20,14 @@
 		<Nullable>enable</Nullable>
 
 		<!-- Display name -->
-		<ApplicationTitle>Chronicae.Windows</ApplicationTitle>
+		<ApplicationTitle>Chronicae - Note Taking App</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.companyname.chronicae.windows</ApplicationId>
+		<ApplicationId>com.chronicae.notetaking</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
+		<ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1.0.0.0</ApplicationVersion>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">11.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
@@ -35,6 +35,15 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
+		
+		<!-- MSIX Packaging Properties -->
+		<WindowsPackageType>MSIX</WindowsPackageType>
+		<GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+		<AppxPackageDir>$(OutputPath)AppPackages\</AppxPackageDir>
+		<PackageCertificateKeyFile>Chronicae_TemporaryKey.pfx</PackageCertificateKeyFile>
+		<PackageCertificatePassword>password</PackageCertificatePassword>
+		<UapAppxPackageBuildMode>StoreUpload</UapAppxPackageBuildMode>
+		<AppxPackageSigningEnabled>Auto</AppxPackageSigningEnabled>
 	</PropertyGroup>
 
 	<ItemGroup>

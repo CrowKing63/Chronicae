@@ -56,4 +56,40 @@ public partial class SettingsPage : ContentPage
             await DisplayAlert("Error", $"Could not open directory: {ex.Message}", "OK");
         }
     }
+
+    private void OnThemeChanged(object sender, EventArgs e)
+    {
+        if (sender is Picker picker && picker.SelectedItem != null)
+        {
+            var selectedTheme = picker.SelectedItem.ToString();
+            switch (selectedTheme)
+            {
+                case "Light":
+                    Application.Current.UserAppTheme = AppTheme.Light;
+                    break;
+                case "Dark":
+                    Application.Current.UserAppTheme = AppTheme.Dark;
+                    break;
+                default: // System Default
+                    Application.Current.UserAppTheme = AppTheme.Unspecified;
+                    break;
+            }
+            
+            // Save the selected theme
+            Preferences.Set("AppTheme", selectedTheme);
+        }
+    }
+    
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        
+        // Load the saved theme setting
+        var savedTheme = Preferences.Get("AppTheme", "System Default");
+        var themeIndex = ThemePicker.Items.IndexOf(savedTheme);
+        if (themeIndex >= 0)
+        {
+            ThemePicker.SelectedIndex = themeIndex;
+        }
+    }
 }
