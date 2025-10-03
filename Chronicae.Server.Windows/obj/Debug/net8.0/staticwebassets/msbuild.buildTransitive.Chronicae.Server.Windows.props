@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\buildMultiTargeting\Chronicae.Server.Windows.props" />
+</Project>

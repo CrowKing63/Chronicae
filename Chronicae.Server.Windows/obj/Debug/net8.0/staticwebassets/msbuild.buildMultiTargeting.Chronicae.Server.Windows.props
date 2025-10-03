@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\Chronicae.Server.Windows.props" />
+</Project>

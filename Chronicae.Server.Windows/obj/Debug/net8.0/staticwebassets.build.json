@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "5c4TVJ9PdhLDDYlDJwr7Za2CULwiX4JHLtQBre0mjbA=",
+  "Source": "Chronicae.Server.Windows",
+  "BasePath": "_content/Chronicae.Server.Windows",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
