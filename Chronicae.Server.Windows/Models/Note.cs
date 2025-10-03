@@ -9,5 +9,6 @@ public class Note
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public string Excerpt { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty; // Added Content property
     public int Version { get; set; }
 }

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Chronicae.Server.Windows")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+834e3663df79aa443909b4d1765ed0d58411fbb3")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6bb4a690dbf306ec55aa70a9fb2dd82ee808841f")]
 [assembly: System.Reflection.AssemblyProductAttribute("Chronicae.Server.Windows")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Chronicae.Server.Windows")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

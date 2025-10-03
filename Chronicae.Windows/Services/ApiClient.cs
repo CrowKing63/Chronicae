@@ -53,4 +53,34 @@ public class ApiClient
             return null;
         }
     }
+
+    public async Task<Project?> CreateProjectAsync(Project project)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("projects", project);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<Project>();
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Error creating project: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<Note?> CreateNoteAsync(string projectId, Note note)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync($"projects/{projectId}/notes", note);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<Note>();
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Error creating note: {ex.Message}");
+            return null;
+        }
+    }
 }

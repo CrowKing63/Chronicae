@@ -1,7 +1,7 @@
-
 using Chronicae.Server.Windows.Data;
 using Chronicae.Server.Windows.Models;
 using Chronicae.Server.Windows.Services;
+using Microsoft.AspNetCore.Mvc; // Added for [FromQuery]
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -72,8 +72,18 @@ app.MapGet("/api/projects/{id}", async (string id, ChronicaeDbContext db) =>
 .WithName("GetProjectById")
 .WithOpenApi();
 
-app.MapPost("/api/projects", async (Project project, ChronicaeDbContext db, SseService sseService) =>
+app.MapPost("/api/projects", async (Project inputProject, ChronicaeDbContext db, SseService sseService) =>
 {
+    var project = new Project
+    {
+        Id = Guid.NewGuid().ToString(),
+        Name = inputProject.Name,
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow,
+        NoteCount = 0,
+        VectorStatus = new VectorStatus { LastIndexedAt = DateTimeOffset.MinValue, PendingJobs = 0 }
+    };
+
     db.Projects.Add(project);
     await db.SaveChangesAsync();
 
@@ -91,7 +101,7 @@ app.MapPut("/api/projects/{id}", async (string id, Project inputProject, Chronic
     if (project is null) return Results.NotFound();
 
     project.Name = inputProject.Name;
-    // Other properties to update
+    project.UpdatedAt = DateTimeOffset.UtcNow; // Update timestamp
 
     await db.SaveChangesAsync();
 
@@ -106,6 +116,10 @@ app.MapDelete("/api/projects/{id}", async (string id, ChronicaeDbContext db, Sse
 {
     if (await db.Projects.FindAsync(id) is Project project)
     {
+        // Delete associated notes first
+        var notesToDelete = await db.Notes.Where(n => n.ProjectId == id).ToListAsync();
+        db.Notes.RemoveRange(notesToDelete);
+
         db.Projects.Remove(project);
         await db.SaveChangesAsync();
 
@@ -138,9 +152,21 @@ app.MapGet("/api/projects/{projectId}/notes/{noteId}", async (string projectId, 
 .WithName("GetNoteById")
 .WithOpenApi();
 
-app.MapPost("/api/projects/{projectId}/notes", async (string projectId, Note note, ChronicaeDbContext db, SseService sseService) =>
+app.MapPost("/api/projects/{projectId}/notes", async (string projectId, Note inputNote, ChronicaeDbContext db, SseService sseService) =>
 {
-    note.ProjectId = projectId;
+    var note = new Note
+    {
+        Id = Guid.NewGuid().ToString(),
+        ProjectId = projectId,
+        Title = inputNote.Title,
+        Tags = inputNote.Tags,
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow,
+        Excerpt = inputNote.Excerpt,
+        Content = inputNote.Content, // Update Content
+        Version = 1 // Initial version
+    };
+
     db.Notes.Add(note);
     await db.SaveChangesAsync();
 
@@ -160,8 +186,9 @@ app.MapPut("/api/projects/{projectId}/notes/{noteId}", async (string projectId, 
     note.Title = inputNote.Title;
     note.Tags = inputNote.Tags;
     note.Excerpt = inputNote.Excerpt;
-    note.Version = inputNote.Version;
-    // and content when added to model
+    note.Content = inputNote.Content; // Update Content
+    note.UpdatedAt = DateTimeOffset.UtcNow; // Update timestamp
+    note.Version++; // Increment version
 
     await db.SaveChangesAsync();
 
@@ -172,12 +199,14 @@ app.MapPut("/api/projects/{projectId}/notes/{noteId}", async (string projectId, 
 .WithName("UpdateNote")
 .WithOpenApi();
 
-app.MapDelete("/api/projects/{projectId}/notes/{noteId}", async (string projectId, string noteId, ChronicaeDbContext db, SseService sseService) =>
+app.MapDelete("/api/projects/{projectId}/notes/{noteId}", async (string projectId, string noteId, ChronicaeDbContext db, SseService sseService, [FromQuery] bool purgeVersions = false) =>
 {
     if (await db.Notes.FindAsync(noteId) is Note note && note.ProjectId == projectId)
     {
         db.Notes.Remove(note);
         await db.SaveChangesAsync();
+
+        // TODO: Implement logic to purge versions if purgeVersions is true
 
         await sseService.BroadcastEvent(new SseEvent { Event = "note.deleted", Data = new { noteId, projectId } });
 

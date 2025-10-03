@@ -1,3 +1,4 @@
+
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Chronicae.Windows.Models;
@@ -8,15 +9,66 @@ namespace Chronicae.Windows;
 public partial class MainPage : ContentPage
 {
     private readonly ApiClient _apiClient;
+    private readonly SseClient _sseClient;
     private Process? _serverProcess;
 
     public ObservableCollection<Project> Projects { get; } = new();
     public ObservableCollection<Note> Notes { get; } = new();
 
-    public MainPage(ApiClient apiClient)
+    // Properties for new project/note input
+    private string _newProjectName = string.Empty;
+    public string NewProjectName
+    {
+        get => _newProjectName;
+        set
+        {
+            if (_newProjectName == value) return;
+            _newProjectName = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private string _newNoteTitle = string.Empty;
+    public string NewNoteTitle
+    {
+        get => _newNoteTitle;
+        set
+        {
+            if (_newNoteTitle == value) return;
+            _newNoteTitle = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private string _newNoteExcerpt = string.Empty;
+    public string NewNoteExcerpt
+    {
+        get => _newNoteExcerpt;
+        set
+        {
+            if (_newNoteExcerpt == value) return;
+            _newNoteExcerpt = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private bool _isProjectSelected;
+    public bool IsProjectSelected
+    {
+        get => _isProjectSelected;
+        set
+        {
+            if (_isProjectSelected == value) return;
+            _isProjectSelected = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public MainPage(ApiClient apiClient, SseClient sseClient)
     {
         InitializeComponent();
         _apiClient = apiClient;
+        _sseClient = sseClient;
         BindingContext = this;
     }
 
@@ -52,6 +104,9 @@ public partial class MainPage : ContentPage
         // Wait a bit for the server to start
         await Task.Delay(2000);
 
+        _sseClient.OnEventReceived += HandleSseEvent;
+        _ = _sseClient.StartListeningAsync(); // Start listening without awaiting
+
         await LoadProjectsAsync();
         await UpdateServerStatusAsync();
     }
@@ -66,22 +121,87 @@ public partial class MainPage : ContentPage
         _serverProcess.Kill();
         _serverProcess = null;
 
+        _sseClient.StopListening();
+        _sseClient.OnEventReceived -= HandleSseEvent;
+
         ServerStatusLabel.Text = "Server Status: Stopped";
         StartButton.IsEnabled = true;
         StopButton.IsEnabled = false;
         Projects.Clear();
         Notes.Clear();
+        IsProjectSelected = false;
+        SelectedProjectLabel.Text = "Selected Project: None";
     }
 
     private async void OnProjectSelected(object sender, SelectedItemChangedEventArgs e)
     {
         if (e.SelectedItem is not Project selectedProject)
         {
+            IsProjectSelected = false; // Update property when no project is selected
+            SelectedProjectLabel.Text = "Selected Project: None";
+            Notes.Clear();
             return;
         }
 
+        IsProjectSelected = true; // Update property when a project is selected
         SelectedProjectLabel.Text = $"Selected Project: {selectedProject.Name}";
         await LoadNotesAsync(selectedProject.Id);
+    }
+
+    private async void OnCreateProjectClicked(object sender, EventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(NewProjectName))
+        {
+            await DisplayAlert("Error", "Project name cannot be empty.", "OK");
+            return;
+        }
+
+        var newProject = new Project { Name = NewProjectName };
+        var createdProject = await _apiClient.CreateProjectAsync(newProject);
+
+        if (createdProject is not null)
+        {
+            NewProjectName = string.Empty; // Clear input
+            await LoadProjectsAsync(); // Refresh list
+        }
+        else
+        {
+            await DisplayAlert("Error", "Failed to create project.", "OK");
+        }
+    }
+
+    private async void OnCreateNoteClicked(object sender, EventArgs e)
+    {
+        if (ProjectsListView.SelectedItem is not Project selectedProject)
+        {
+            await DisplayAlert("Error", "Please select a project first.", "OK");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(NewNoteTitle))
+        {
+            await DisplayAlert("Error", "Note title cannot be empty.", "OK");
+            return;
+        }
+
+        var newNote = new Note
+        {
+            Title = NewNoteTitle,
+            Excerpt = NewNoteExcerpt,
+            Tags = new List<string>() // Initialize with empty list for now
+        };
+        var createdNote = await _apiClient.CreateNoteAsync(selectedProject.Id, newNote);
+
+        if (createdNote is not null)
+        {
+            NewNoteTitle = string.Empty; // Clear input
+            NewNoteExcerpt = string.Empty; // Clear input
+            await LoadNotesAsync(selectedProject.Id);
+        }
+        else
+        {
+            await DisplayAlert("Error", "Failed to create note.", "OK");
+        }
     }
 
     private async Task LoadProjectsAsync()
@@ -121,5 +241,17 @@ public partial class MainPage : ContentPage
         {
             ServerStatusLabel.Text = "Server Status: Running (Status API Error)";
         }
+    }
+
+    private async void HandleSseEvent(SseEvent sseEvent)
+    {
+        // For now, just refresh projects and notes on any event
+        await LoadProjectsAsync();
+        // If a project is selected, also refresh its notes
+        if (ProjectsListView.SelectedItem is Project selectedProject)
+        {
+            await LoadNotesAsync(selectedProject.Id);
+        }
+        await UpdateServerStatusAsync();
     }
 }

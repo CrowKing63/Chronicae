@@ -51,6 +51,13 @@
             </ListView.ItemTemplate>
         </ListView>
 
+        <Entry Placeholder="New Project Name" Text="{Binding NewProjectName}" Margin="0,20,0,0" />
+        <Button Text="Create Project" Clicked="OnCreateProjectClicked" />
+
+        <Entry Placeholder="New Note Title" Text="{Binding NewNoteTitle}" Margin="0,20,0,0" />
+        <Entry Placeholder="New Note Excerpt" Text="{Binding NewNoteExcerpt}" />
+        <Button Text="Create Note" Clicked="OnCreateNoteClicked" IsEnabled="{Binding IsProjectSelected}" />
+
     </VerticalStackLayout>
 
 </ContentPage>
