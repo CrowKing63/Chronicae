@@ -2,14 +2,17 @@ import SwiftUI
 import Observation
 
 struct ContentView: View {
-    @State private var appState = AppState()
+    @Bindable private var appState: AppState
+    @Bindable private var serverManager: ServerManager
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var serverManager = ServerManager.shared
+    @State private var routerToken: UUID?
+
+    init(appState: AppState, serverManager: ServerManager) {
+        self.appState = appState
+        self.serverManager = serverManager
+    }
 
     var body: some View {
-        @Bindable var appState = appState
-        @Bindable var serverManager = serverManager
-
         return NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(appState: appState)
         } content: {
@@ -40,6 +43,8 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 1080, minHeight: 720)
+        .onAppear(perform: registerRouter)
+        .onDisappear(perform: unregisterRouter)
     }
 
     private var placeholderView: some View {
@@ -69,8 +74,25 @@ struct ContentView: View {
             SettingsView(appState: appState, serverManager: serverManager)
         }
     }
+
+    @MainActor
+    private func registerRouter() {
+        guard routerToken == nil else { return }
+        routerToken = AppSceneRouter.shared.register { section in
+            Task { @MainActor in
+                appState.selectedSection = section
+            }
+        }
+    }
+
+    @MainActor
+    private func unregisterRouter() {
+        guard let routerToken else { return }
+        AppSceneRouter.shared.unregister(routerToken)
+        self.routerToken = nil
+    }
 }
 
 #Preview {
-    ContentView()
+    ContentView(appState: AppState(), serverManager: ServerManager.shared)
 }
