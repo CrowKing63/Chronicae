@@ -110,6 +110,7 @@
   - **설명**: 전체 업데이트. 자동 저장 시 사용.
   - **요청**: `title`, `content`, `tags`, `lastKnownVersion`
   - **충돌 대응**: `If-Match` 헤더 또는 `lastKnownVersion` 필드로 버전 충돌(409) 감지.
+  - **409 응답**: `{ "code": "note_conflict", "message": "...", "note": Note }`
 
 - `PATCH /projects/{projectId}/notes/{noteId}`
   - **설명**: 부분 업데이트. 예: 태그만 변경.
@@ -175,6 +176,7 @@
     - `project.switched`
     - `index.job.started|completed`
     - `backup.completed`
+    - `ai.session.completed`
 
 ### 8. 내보내기
 - `GET /projects/{projectId}/notes/{noteId}/export`
@@ -207,4 +209,3 @@
 - GraphQL 게이트웨이 고려 (필요시).
 - 다중 사용자 지원을 위한 권한 모델 (`role`, `permissions`).
 - Vision Pro에서의 오프라인 캐시와 동기화 API (`syncToken`).
-

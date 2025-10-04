@@ -22,12 +22,32 @@ struct ServerAPIClient {
         return try await request(path: "/api/projects", method: "POST", body: payload)
     }
 
+    func fetchProject(id: UUID, includeStats: Bool = false) async throws -> ProjectSummary {
+        let suffix = includeStats ? "?includeStats=true" : ""
+        let response: ProjectDetailPayload = try await request(
+            path: "/api/projects/\(id.uuidString)\(suffix)",
+            method: "GET",
+            body: EmptyBody()
+        )
+        return response.project
+    }
+
     func switchProject(id: UUID) async throws -> ProjectResponsePayload {
         try await request(path: "/api/projects/\(id.uuidString)/switch", method: "POST", body: EmptyBody())
     }
 
     func resetProject(id: UUID) async throws -> ProjectResponsePayload {
         try await request(path: "/api/projects/\(id.uuidString)/reset", method: "POST", body: EmptyBody())
+    }
+
+    func updateProject(id: UUID, name: String, includeStats: Bool = false) async throws -> ProjectResponsePayload {
+        let suffix = includeStats ? "?includeStats=true" : ""
+        let payload = ProjectUpdatePayload(name: name)
+        return try await request(
+            path: "/api/projects/\(id.uuidString)\(suffix)",
+            method: "PUT",
+            body: payload
+        )
     }
 
     func deleteProject(id: UUID) async throws {
@@ -40,9 +60,23 @@ struct ServerAPIClient {
 
     // MARK: - Notes
 
-    func fetchNotes(projectId: UUID) async throws -> [NoteSummary] {
-        let response: NoteListPayload = try await request(path: "/api/projects/\(projectId.uuidString)/notes", method: "GET", body: EmptyBody())
-        return response.items
+    func fetchNotes(projectId: UUID,
+                    cursor: String? = nil,
+                    limit: Int = 50,
+                    search: String? = nil) async throws -> NoteListPayload {
+        let boundedLimit = max(1, min(limit, 200))
+        var components = URLComponents()
+        components.path = "/api/projects/\(projectId.uuidString)/notes"
+        var queryItems: [URLQueryItem] = [URLQueryItem(name: "limit", value: String(boundedLimit))]
+        if let cursor, !cursor.isEmpty {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        if let search, !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            queryItems.append(URLQueryItem(name: "search", value: search))
+        }
+        components.queryItems = queryItems
+        let path = components.string ?? "/api/projects/\(projectId.uuidString)/notes?limit=\(boundedLimit)"
+        return try await request(path: path, method: "GET", body: EmptyBody())
     }
 
     func createNote(projectId: UUID, title: String, content: String, tags: [String]) async throws -> NoteSummary {
@@ -51,8 +85,16 @@ struct ServerAPIClient {
         return response.note
     }
 
-    func updateNote(projectId: UUID, noteId: UUID, title: String, content: String, tags: [String]) async throws -> NoteSummary {
-        let payload = NoteUpdatePayload(title: title, content: content, tags: tags)
+    func updateNote(projectId: UUID,
+                    noteId: UUID,
+                    title: String,
+                    content: String,
+                    tags: [String],
+                    lastKnownVersion: Int? = nil) async throws -> NoteSummary {
+        let payload = NoteUpdatePayload(title: title,
+                                        content: content,
+                                        tags: tags,
+                                        lastKnownVersion: lastKnownVersion)
         let response: NoteResponsePayload = try await request(path: "/api/projects/\(projectId.uuidString)/notes/\(noteId.uuidString)", method: "PUT", body: payload)
         return response.note
     }
@@ -129,6 +171,9 @@ struct ServerAPIClient {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 409, let conflict = try? decode(NoteConflictPayload.self, from: data) {
+                throw ServerAPIError.noteConflict(conflict)
+            }
             let apiError = try? decode(APIErrorPayload.self, from: data)
             throw ServerAPIError.server(statusCode: httpResponse.statusCode, apiError: apiError)
         }
@@ -166,6 +211,7 @@ enum ServerAPIError: Error {
     case invalidURL
     case invalidResponse
     case server(statusCode: Int, apiError: APIErrorPayload?)
+    case noteConflict(NoteConflictPayload)
     case emptyBody
 }
 
@@ -181,6 +227,8 @@ extension ServerAPIError: LocalizedError {
                 return message
             }
             return "서버 오류 (코드 \(statusCode))"
+        case let .noteConflict(payload):
+            return payload.message
         case .emptyBody:
             return "서버에서 비어 있는 응답이 도착했습니다."
         }

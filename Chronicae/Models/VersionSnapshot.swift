@@ -7,4 +7,5 @@ struct VersionSnapshot: Identifiable, Hashable, Codable, Sendable {
     var preview: String
     var projectId: UUID
     var noteId: UUID
+    var version: Int
 }

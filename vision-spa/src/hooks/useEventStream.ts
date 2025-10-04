@@ -24,6 +24,8 @@ export const useEventStream = (url: string, handler: EventStreamHandler) => {
       'note.version.export.queued',
       'project.reset',
       'project.deleted',
+      'project.switched',
+      'ai.session.completed',
       'backup.completed',
       'ping'
     ];

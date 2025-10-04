@@ -36,16 +36,17 @@ struct ServerAPIClientIntegrationTests {
 
         // Device B reads the note list and observes Device A's change
         let notesOnB = try await clientB.fetchNotes(projectId: projectId)
-        #expect(notesOnB.count == 1)
-        #expect(notesOnB.first?.id == initialNote.id)
-        #expect(notesOnB.first?.content.contains("Device A") == true)
+        #expect(notesOnB.items.count == 1)
+        #expect(notesOnB.items.first?.id == initialNote.id)
+        #expect(notesOnB.items.first?.content.contains("Device A") == true)
 
         // Device B updates the note content
         let updatedNote = try await clientB.updateNote(projectId: projectId,
                                                         noteId: initialNote.id,
                                                         title: "다중 디바이스 초안",
                                                         content: "Device B refined the content.",
-                                                        tags: ["sync", "edited"])
+                                                        tags: ["sync", "edited"],
+                                                        lastKnownVersion: initialNote.version)
 
         #expect(updatedNote.version == initialNote.version + 1)
 

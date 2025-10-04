@@ -376,12 +376,22 @@ struct StorageManagementView: View {
                                                           noteId: noteId,
                                                           title: noteTitleDraft,
                                                           content: noteContentDraft,
-                                                          tags: tags)
+                                                          tags: tags,
+                                                          lastKnownVersion: appState.selectedNote?.version)
                 await appState.refreshNotes(using: serverManager)
                 await MainActor.run {
                     appState.updateSelectedNote(updated)
                     loadDraftFromSelection()
                     showToast("노트를 저장했습니다", systemImage: "checkmark.circle")
+                }
+            } catch let ServerAPIError.noteConflict(conflict) {
+                await appState.refreshNotes(using: serverManager)
+                await MainActor.run {
+                    errorMessage = conflict.message
+                    appState.updateSelectedNote(conflict.note)
+                    noteTitleDraft = conflict.note.title
+                    noteContentDraft = conflict.note.content
+                    noteTagsDraft = conflict.note.tags.joined(separator: ", ")
                 }
             } catch {
                 await MainActor.run { errorMessage = error.localizedDescription }

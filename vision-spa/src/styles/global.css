@@ -52,10 +52,108 @@ p {
   color: #ff6d6d;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 320px 1fr 320px;
   gap: 24px;
+}
+
+.project-bar {
+  background: rgba(8, 12, 20, 0.74);
+  border: 1px solid rgba(126, 160, 255, 0.18);
+  border-radius: 24px;
+  padding: 24px 32px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  backdrop-filter: blur(24px);
+}
+
+.project-bar__info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.project-bar__title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.project-bar__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.project-bar__select select {
+  background: rgba(18, 26, 40, 0.9);
+  border: 1px solid rgba(126, 160, 255, 0.32);
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  min-width: 180px;
+}
+
+.project-bar__select select:focus {
+  outline: none;
+  border-color: rgba(114, 185, 255, 0.78);
+  box-shadow: 0 0 0 2px rgba(114, 185, 255, 0.28);
+}
+
+.project-bar__select select:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.project-bar__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  min-width: 320px;
+}
+
+.metric-card {
+  background: rgba(20, 28, 44, 0.82);
+  border: 1px solid rgba(126, 160, 255, 0.16);
+  border-radius: 18px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metric-card__label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(235, 240, 255, 0.58);
+}
+
+.metric-card__value {
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.75rem;
+  color: rgba(243, 246, 255, 0.5);
 }
 
 .panel {
@@ -172,6 +270,14 @@ p {
 
 .list--empty {
   padding: 32px 28px;
+}
+
+.list__footer {
+  padding: 8px 0 16px;
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .list__item {

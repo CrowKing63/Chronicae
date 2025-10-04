@@ -17,6 +17,7 @@ import Observation
     var projects: [ProjectSummary] = []
     var notes: [NoteSummary] = []
     var selectedNote: NoteSummary? = nil
+    var notesNextCursor: String? = nil
     var lastUpdated: Date = .now
     var lastErrorMessage: String? = nil
     var lastBackupRecord: ServerDataStore.BackupRecord? = nil
@@ -42,6 +43,7 @@ import Observation
                 activeProject = payload.items.first
             }
             notes = []
+            notesNextCursor = nil
             selectedNote = nil
             lastUpdated = .now
             lastErrorMessage = nil
@@ -59,18 +61,52 @@ import Observation
         }
         do {
             let client = serverManager.makeAPIClient()
-            let fetched = try await client.fetchNotes(projectId: projectId)
-            notes = fetched
-            if let current = selectedNote, let preserved = fetched.first(where: { $0.id == current.id }) {
+            let payload = try await client.fetchNotes(projectId: projectId)
+            notes = payload.items
+            notesNextCursor = payload.nextCursor
+            if let current = selectedNote, let preserved = payload.items.first(where: { $0.id == current.id }) {
                 selectedNote = preserved
             } else {
-                selectedNote = fetched.first
+                selectedNote = payload.items.first
             }
             lastUpdated = .now
             lastErrorMessage = nil
         } catch {
             notes = []
+            notesNextCursor = nil
             selectedNote = nil
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func loadMoreNotes(using serverManager: ServerManager) async {
+        guard let projectId = activeProject?.id, let cursor = notesNextCursor else { return }
+        do {
+            let client = serverManager.makeAPIClient()
+            let payload = try await client.fetchNotes(projectId: projectId, cursor: cursor)
+            let incoming = payload.items
+            var updatedNotes = notes
+            for note in incoming {
+                if let index = updatedNotes.firstIndex(where: { $0.id == note.id }) {
+                    updatedNotes[index] = note
+                } else {
+                    updatedNotes.append(note)
+                }
+            }
+            updatedNotes.sort {
+                if $0.updatedAt == $1.updatedAt {
+                    return $0.createdAt > $1.createdAt
+                }
+                return $0.updatedAt > $1.updatedAt
+            }
+            notes = updatedNotes
+            notesNextCursor = payload.nextCursor
+            if let current = selectedNote, !updatedNotes.contains(where: { $0.id == current.id }) {
+                selectedNote = updatedNotes.first
+            }
+            lastUpdated = .now
+        } catch {
             lastErrorMessage = error.localizedDescription
         }
     }
@@ -158,7 +194,7 @@ import Observation
     private func handleEvent(message: EventStreamMessage, serverManager: ServerManager) async {
         guard let eventType = AppEventType(rawValue: message.event) else { return }
         switch eventType {
-        case .projectReset, .projectDeleted:
+        case .projectReset, .projectDeleted, .projectSwitched:
             await refreshProjects(using: serverManager)
             await refreshNotes(using: serverManager)
         case .noteCreated, .noteUpdated:
@@ -177,6 +213,10 @@ import Observation
             await refreshNotes(using: serverManager)
         case .noteExportQueued, .noteVersionExportQueued:
             break
+        case .indexJobCompleted:
+            lastUpdated = .now
+        case .aiSessionCompleted:
+            lastUpdated = .now
         case .backupCompleted:
             if let payload: BackupRecordPayload = decode(message.data),
                let status = ServerDataStore.BackupRecord.Status(rawValue: payload.status) {
@@ -214,8 +254,16 @@ import Observation
 }
 
 struct ProjectSummary: Identifiable, Hashable, Codable, Sendable {
+    struct Stats: Hashable, Codable, Sendable {
+        var versionCount: Int
+        var latestNoteUpdatedAt: Date?
+        var uniqueTagCount: Int
+        var averageNoteLength: Double
+    }
+
     let id: UUID
     var name: String
     var noteCount: Int
     var lastIndexedAt: Date?
+    var stats: Stats?
 }

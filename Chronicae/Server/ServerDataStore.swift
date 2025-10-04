@@ -6,6 +6,76 @@ import OSLog
 final class ServerDataStore {
     static let shared = ServerDataStore(persistentStore: .shared)
 
+    struct NoteListResult {
+        let items: [NoteSummary]
+        let nextCursor: String?
+    }
+
+    enum SearchMode: String, Codable, Sendable {
+        case keyword
+        case semantic
+    }
+
+    struct SearchResult: Codable, Sendable {
+        let noteId: UUID
+        let projectId: UUID
+        let title: String
+        let snippet: String
+        let score: Double
+    }
+
+    struct AIQueryOptions: Codable, Sendable {
+        let temperature: Double?
+        let maxTokens: Int?
+    }
+
+    struct IndexJob: Identifiable, Codable, Sendable {
+        enum Status: String, Codable, Sendable {
+            case queued
+            case inProgress
+            case completed
+        }
+
+        let id: UUID
+        let projectId: UUID?
+        var status: Status
+        let startedAt: Date
+        var finishedAt: Date?
+    }
+
+    struct AIMode: Codable, Sendable {
+        let id: String
+        let name: String
+        let description: String
+    }
+
+    struct AISession: Identifiable, Codable, Sendable {
+        enum Status: String, Codable, Sendable {
+            case processing
+            case completed
+        }
+
+        struct Message: Codable, Sendable {
+            enum Role: String, Codable, Sendable {
+                case user
+                case assistant
+            }
+
+            let id: UUID
+            let role: Role
+            let content: String
+            let createdAt: Date
+        }
+
+        let id: UUID
+        let projectId: UUID?
+        let mode: String
+        let createdAt: Date
+        var updatedAt: Date
+        var status: Status
+        var messages: [Message]
+    }
+
     struct ExportJob: Identifiable, Codable, Sendable {
         enum Status: String, Codable {
             case queued
@@ -32,6 +102,11 @@ final class ServerDataStore {
         var artifactPath: String?
     }
 
+    struct VersionDetail: Codable, Sendable {
+        let snapshot: VersionSnapshot
+        let content: String
+    }
+
     private let persistentStore: ServerPersistentStore
     private let context: NSManagedObjectContext
     private let logger = Logger(subsystem: "com.chronicae.app", category: "ServerDataStore")
@@ -42,6 +117,14 @@ final class ServerDataStore {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys]
         return encoder
+    }()
+    private var indexJobs: [IndexJob] = []
+    private var aiSessions: [UUID: AISession] = [:]
+    private static let cursorDateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter
     }()
 
     init(persistentStore: ServerPersistentStore,
@@ -73,11 +156,14 @@ final class ServerDataStore {
 
     // MARK: - Projects
 
-    func listProjects() -> (items: [ProjectSummary], active: UUID?) {
+    func listProjects(includeStats: Bool = false) -> (items: [ProjectSummary], active: UUID?) {
         let request: NSFetchRequest<CDProject> = CDProject.fetchRequest()
         request.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
         let projects = (try? context.fetch(request)) ?? []
-        let summaries = projects.map(makeProjectSummary)
+        let summaries = projects.map { project in
+            let stats = includeStats ? makeProjectStats(from: project) : nil
+            return makeProjectSummary(from: project, stats: stats)
+        }
         if activeProjectId == nil, let first = summaries.first?.id {
             activeProjectId = first
         }
@@ -98,7 +184,9 @@ final class ServerDataStore {
     func switchProject(id: UUID) -> ProjectSummary? {
         guard let project = fetchProject(id: id) else { return nil }
         activeProjectId = id
-        return makeProjectSummary(from: project)
+        let summary = makeProjectSummary(from: project)
+        publishEvent(type: .projectSwitched, payload: summary)
+        return summary
     }
 
     func resetProject(id: UUID) -> ProjectSummary? {
@@ -125,21 +213,93 @@ final class ServerDataStore {
         publishEvent(type: .projectDeleted, payload: summary)
     }
 
+    func fetchProjectSummary(id: UUID, includeStats: Bool = false) -> ProjectSummary? {
+        guard let project = fetchProject(id: id) else { return nil }
+        let stats = includeStats ? makeProjectStats(from: project) : nil
+        return makeProjectSummary(from: project, stats: stats)
+    }
+
+    func updateProject(id: UUID, name: String, includeStats: Bool = false) -> ProjectSummary? {
+        guard let project = fetchProject(id: id) else { return nil }
+        project.name = name
+        saveIfNeeded()
+        let stats = includeStats ? makeProjectStats(from: project) : nil
+        return makeProjectSummary(from: project, stats: stats)
+    }
+
     // MARK: - Notes
 
-    func listNotes(projectId: UUID, limit: Int = 100) -> [NoteSummary]? {
+    func listNotes(projectId: UUID,
+                   cursor: String? = nil,
+                   limit: Int = 50,
+                   search: String? = nil) -> NoteListResult? {
         guard fetchProject(id: projectId) != nil else { return nil }
+
         let request: NSFetchRequest<CDNote> = CDNote.fetchRequest()
-        request.predicate = NSPredicate(format: "project.id == %@", projectId as CVarArg)
-        request.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false)]
-        request.fetchLimit = limit
+        var predicates: [NSPredicate] = [NSPredicate(format: "project.id == %@", projectId as CVarArg)]
+
+        if let term = search?.trimmingCharacters(in: .whitespacesAndNewlines), !term.isEmpty {
+            let searchPredicates = [
+                NSPredicate(format: "title CONTAINS[cd] %@", term),
+                NSPredicate(format: "content CONTAINS[cd] %@", term),
+                NSPredicate(format: "excerpt CONTAINS[cd] %@", term),
+                NSPredicate(format: "tags CONTAINS[cd] %@", term)
+            ]
+            predicates.append(NSCompoundPredicate(orPredicateWithSubpredicates: searchPredicates))
+        }
+
+        if let cursor, let decoded = decodeCursor(cursor) {
+            let paginationPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
+                NSPredicate(format: "updatedAt < %@", decoded.updatedAt as NSDate),
+                NSCompoundPredicate(andPredicateWithSubpredicates: [
+                    NSPredicate(format: "updatedAt == %@", decoded.updatedAt as NSDate),
+                    NSPredicate(format: "createdAt < %@", decoded.createdAt as NSDate)
+                ])
+            ])
+            predicates.append(paginationPredicate)
+            predicates.append(NSPredicate(format: "NOT (id == %@)", decoded.id as CVarArg))
+        }
+
+        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+        request.sortDescriptors = [
+            NSSortDescriptor(key: "updatedAt", ascending: false),
+            NSSortDescriptor(key: "createdAt", ascending: false)
+        ]
+
+        let boundedLimit = max(1, min(limit, 200))
+        request.fetchLimit = boundedLimit + 1
+
         let notes = (try? context.fetch(request)) ?? []
-        return notes.map(makeNoteSummary)
+        let paged = Array(notes.prefix(boundedLimit))
+        let items = paged.map(makeNoteSummary)
+
+        let nextCursor: String?
+        if notes.count > boundedLimit, let last = paged.last {
+            nextCursor = encodeCursor(updatedAt: last.updatedAt,
+                                      createdAt: last.createdAt,
+                                      id: last.id)
+        } else {
+            nextCursor = nil
+        }
+
+        return NoteListResult(items: items, nextCursor: nextCursor)
     }
 
     func fetchNote(projectId: UUID, noteId: UUID) -> NoteSummary? {
         guard let note = fetchNoteEntity(projectId: projectId, noteId: noteId) else { return nil }
         return makeNoteSummary(from: note)
+    }
+
+    enum NoteUpdateMode {
+        case full
+        case partial
+    }
+
+    enum NoteUpdateResult {
+        case success(NoteSummary)
+        case conflict(NoteSummary)
+        case invalidPayload
+        case notFound
     }
 
     func createNote(projectId: UUID, title: String, content: String, tags: [String]) -> NoteSummary? {
@@ -165,24 +325,173 @@ final class ServerDataStore {
         return summary
     }
 
-    func updateNote(projectId: UUID, noteId: UUID, title: String, content: String, tags: [String]) -> NoteSummary? {
-        guard let note = fetchNoteEntity(projectId: projectId, noteId: noteId) else { return nil }
-        note.title = title
-        note.content = content
-        note.excerpt = makeExcerpt(from: content)
-        note.tags = encodeTags(tags)
-        note.updatedAt = Date()
-        note.version += 1
-        _ = appendVersion(for: note)
-        note.project.lastIndexedAt = note.updatedAt
-        saveIfNeeded()
-        let summary = makeNoteSummary(from: note)
-        publishEvent(type: .noteUpdated, payload: summary)
-        return summary
+    func updateNote(projectId: UUID,
+                    noteId: UUID,
+                    title: String?,
+                    content: String?,
+                    tags: [String]?,
+                    mode: NoteUpdateMode,
+                    lastKnownVersion: Int?) -> NoteUpdateResult {
+        guard let note = fetchNoteEntity(projectId: projectId, noteId: noteId) else {
+            return .notFound
+        }
+
+        if let lastKnownVersion, Int(note.version) != lastKnownVersion {
+            return .conflict(makeNoteSummary(from: note))
+        }
+
+        let resolvedTitle: String
+        let resolvedContent: String
+        let resolvedTags: [String]
+
+        switch mode {
+        case .full:
+            guard let title, let content, let tags else {
+                return .invalidPayload
+            }
+            resolvedTitle = title
+            resolvedContent = content
+            resolvedTags = tags
+        case .partial:
+            guard title != nil || content != nil || tags != nil else {
+                return .invalidPayload
+            }
+            resolvedTitle = title ?? note.title
+            resolvedContent = content ?? note.content
+            resolvedTags = tags ?? decodeTags(note.tags)
+        }
+
+        var hasChanges = false
+
+        if note.title != resolvedTitle {
+            note.title = resolvedTitle
+            hasChanges = true
+        }
+
+        if note.content != resolvedContent {
+            note.content = resolvedContent
+            note.excerpt = makeExcerpt(from: resolvedContent)
+            hasChanges = true
+        } else if mode == .full {
+            note.excerpt = makeExcerpt(from: resolvedContent)
+        }
+
+        let encodedTags = encodeTags(resolvedTags)
+        if note.tags != encodedTags {
+            note.tags = encodedTags
+            hasChanges = true
+        }
+
+        if hasChanges {
+            note.updatedAt = Date()
+            note.version += 1
+            _ = appendVersion(for: note)
+            note.project.lastIndexedAt = note.updatedAt
+            saveIfNeeded()
+            let summary = makeNoteSummary(from: note)
+            publishEvent(type: .noteUpdated, payload: summary)
+            return .success(summary)
+        } else {
+            saveIfNeeded()
+            let summary = makeNoteSummary(from: note)
+            return .success(summary)
+        }
     }
 
-    func deleteNote(projectId: UUID, noteId: UUID) {
+    func searchNotes(projectId: UUID?, query: String, mode: SearchMode = .keyword, limit: Int = 20) -> [SearchResult] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        let request: NSFetchRequest<CDNote> = CDNote.fetchRequest()
+        var predicates: [NSPredicate] = []
+        if let projectId {
+            predicates.append(NSPredicate(format: "project.id == %@", projectId as CVarArg))
+        }
+        let keywordPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
+            NSPredicate(format: "title CONTAINS[cd] %@", trimmed),
+            NSPredicate(format: "content CONTAINS[cd] %@", trimmed),
+            NSPredicate(format: "excerpt CONTAINS[cd] %@", trimmed),
+            NSPredicate(format: "tags CONTAINS[cd] %@", trimmed)
+        ])
+        predicates.append(keywordPredicate)
+        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+        request.sortDescriptors = [NSSortDescriptor(key: "updatedAt", ascending: false)]
+        let boundedLimit = max(1, min(limit, 50))
+        request.fetchLimit = boundedLimit
+        let matches = (try? context.fetch(request)) ?? []
+
+        return matches.map { note in
+            let snippet = makeSearchSnippet(from: note, query: trimmed)
+            let score = computeSearchScore(for: note, query: trimmed, mode: mode)
+            return SearchResult(noteId: note.id,
+                                projectId: note.project.id,
+                                title: note.title,
+                                snippet: snippet,
+                                score: score)
+        }
+    }
+
+    func rebuildIndex(projectId: UUID?) -> IndexJob {
+        var job = IndexJob(id: UUID(),
+                           projectId: projectId,
+                           status: .queued,
+                           startedAt: Date(),
+                           finishedAt: nil)
+        indexJobs.insert(job, at: 0)
+        if indexJobs.count > 20 {
+            indexJobs = Array(indexJobs.prefix(20))
+        }
+        job.status = .completed
+        job.finishedAt = Date()
+        indexJobs[0] = job
+        publishEvent(type: .indexJobCompleted, payload: job)
+        return job
+    }
+
+    func listIndexJobs() -> [IndexJob] {
+        indexJobs
+    }
+
+    func createAISession(projectId: UUID?, mode: String, query: String, options: AIQueryOptions?) -> AISession {
+        let now = Date()
+        let sessionId = UUID()
+        let userMessage = AISession.Message(id: UUID(), role: .user, content: query, createdAt: now)
+        let assistantContent = synthesizeAIResponse(query: query, mode: mode, options: options)
+        let assistantMessage = AISession.Message(id: UUID(), role: .assistant, content: assistantContent, createdAt: now)
+        var session = AISession(id: sessionId,
+                                projectId: projectId,
+                                mode: mode,
+                                createdAt: now,
+                                updatedAt: now,
+                                status: .completed,
+                                messages: [userMessage, assistantMessage])
+        aiSessions[sessionId] = session
+        publishEvent(type: .aiSessionCompleted, payload: session)
+        return session
+    }
+
+    func fetchAISession(id: UUID) -> AISession? {
+        aiSessions[id]
+    }
+
+    func deleteAISession(id: UUID) {
+        aiSessions.removeValue(forKey: id)
+    }
+
+    func availableAIModes() -> [AIMode] {
+        [
+            AIMode(id: "local_rag", name: "로컬 RAG", description: "내장된 노트 지식을 기반으로 응답"),
+            AIMode(id: "summary", name: "요약", description: "요약 전용 모드")
+        ]
+    }
+
+    func deleteNote(projectId: UUID, noteId: UUID, purgeVersions: Bool = false) {
         guard let note = fetchNoteEntity(projectId: projectId, noteId: noteId) else { return }
+        if purgeVersions {
+            for version in Array(note.versions) {
+                context.delete(version)
+            }
+        }
         let project = note.project
         let payload = NoteIdentifierPayload(id: note.id, projectId: project.id)
         context.delete(note)
@@ -202,6 +511,12 @@ final class ServerDataStore {
         request.fetchLimit = limit
         let versions = (try? context.fetch(request)) ?? []
         return versions.map(makeVersionSnapshot)
+    }
+
+    func fetchVersionDetail(noteId: UUID, versionId: UUID) -> VersionDetail? {
+        guard let version = fetchNoteVersion(versionId: versionId, noteId: noteId) else { return nil }
+        let snapshot = makeVersionSnapshot(from: version)
+        return VersionDetail(snapshot: snapshot, content: version.content)
     }
 
     func restoreVersion(noteId: UUID, versionId: UUID) -> VersionSnapshot? {
@@ -354,11 +669,112 @@ final class ServerDataStore {
         return (try? JSONDecoder().decode([String].self, from: data)) ?? []
     }
 
-    private func makeProjectSummary(from project: CDProject) -> ProjectSummary {
+    private func encodeCursor(updatedAt: Date, createdAt: Date, id: UUID) -> String {
+        let formatter = Self.cursorDateFormatter
+        let raw = [
+            formatter.string(from: updatedAt),
+            formatter.string(from: createdAt),
+            id.uuidString
+        ].joined(separator: "|")
+        return Data(raw.utf8).base64EncodedString()
+    }
+
+    private func decodeCursor(_ value: String) -> (updatedAt: Date, createdAt: Date, id: UUID)? {
+        guard let data = Data(base64Encoded: value),
+              let raw = String(data: data, encoding: .utf8) else { return nil }
+        let parts = raw.split(separator: "|", omittingEmptySubsequences: false)
+        guard parts.count == 3 else { return nil }
+        let formatter = Self.cursorDateFormatter
+        guard let updated = formatter.date(from: String(parts[0])),
+              let created = formatter.date(from: String(parts[1])),
+              let id = UUID(uuidString: String(parts[2])) else { return nil }
+        return (updated, created, id)
+    }
+
+    private func makeSearchSnippet(from note: CDNote, query: String, limit: Int = 160) -> String {
+        let lowercasedQuery = query.lowercased()
+        let source = note.content.isEmpty ? (note.excerpt ?? "") : note.content
+        let lower = source.lowercased()
+        if let range = lower.range(of: lowercasedQuery) {
+            let startIndex = source.index(range.lowerBound, offsetBy: -min(30, source.distance(from: source.startIndex, to: range.lowerBound)), limitedBy: source.startIndex) ?? source.startIndex
+            let endIndex = source.index(range.upperBound, offsetBy: limit, limitedBy: source.endIndex) ?? source.endIndex
+            let snippet = source[startIndex..<endIndex]
+            return snippet.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return makeExcerpt(from: source, limit: limit)
+    }
+
+    private func computeSearchScore(for note: CDNote, query: String, mode: SearchMode) -> Double {
+        let lowerQuery = query.lowercased()
+        var score = 0.0
+        if note.title.lowercased().contains(lowerQuery) {
+            score += 0.6
+        }
+        if note.content.lowercased().contains(lowerQuery) {
+            score += 0.3
+        }
+        if decodeTags(note.tags).contains(where: { $0.lowercased().contains(lowerQuery) }) {
+            score += 0.2
+        }
+        if mode == .semantic {
+            score += 0.1
+        }
+        return min(score, 1.0)
+    }
+
+    private func synthesizeAIResponse(query: String, mode: String, options: AIQueryOptions?) -> String {
+        var components: [String] = []
+        components.append("질문: \(query)")
+        switch mode.lowercased() {
+        case "summary":
+            components.append("응답: 제공된 노트를 기반으로 핵심만 요약했습니다.")
+        default:
+            components.append("응답: 로컬 검색 결과를 참고해 답변을 생성했습니다.")
+        }
+        if let temperature = options?.temperature {
+            components.append("temperature=\(String(format: "%.2f", temperature))")
+        }
+        if let maxTokens = options?.maxTokens {
+            components.append("maxTokens=\(maxTokens)")
+        }
+        return components.joined(separator: "\n")
+    }
+
+    private func makeProjectSummary(from project: CDProject, stats: ProjectSummary.Stats? = nil) -> ProjectSummary {
         ProjectSummary(id: project.id,
                        name: project.name,
                        noteCount: Int(project.noteCount),
-                       lastIndexedAt: project.lastIndexedAt)
+                       lastIndexedAt: project.lastIndexedAt,
+                       stats: stats)
+    }
+
+    private func makeProjectStats(from project: CDProject) -> ProjectSummary.Stats {
+        var versionCount = 0
+        var latestUpdatedAt: Date?
+        var uniqueTags = Set<String>()
+        var totalNoteLength = 0
+        let notes = project.notes
+
+        for note in notes {
+            versionCount += note.versions.count
+            if let currentLatest = latestUpdatedAt {
+                if note.updatedAt > currentLatest {
+                    latestUpdatedAt = note.updatedAt
+                }
+            } else {
+                latestUpdatedAt = note.updatedAt
+            }
+            decodeTags(note.tags).forEach { uniqueTags.insert($0) }
+            totalNoteLength += note.content.count
+        }
+
+        let noteCount = notes.count
+        let averageLength = noteCount > 0 ? Double(totalNoteLength) / Double(noteCount) : 0
+
+        return ProjectSummary.Stats(versionCount: versionCount,
+                                    latestNoteUpdatedAt: latestUpdatedAt,
+                                    uniqueTagCount: uniqueTags.count,
+                                    averageNoteLength: averageLength)
     }
 
     private func makeNoteSummary(from note: CDNote) -> NoteSummary {
@@ -379,7 +795,8 @@ final class ServerDataStore {
                         timestamp: version.createdAt,
                         preview: version.excerpt ?? "",
                         projectId: version.note.project.id,
-                        noteId: version.note.id)
+                        noteId: version.note.id,
+                        version: Int(version.version))
     }
 
     private func makeExportJob(from job: CDExportJob) -> ExportJob {
