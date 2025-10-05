@@ -458,7 +458,7 @@ final class ServerDataStore {
         let userMessage = AISession.Message(id: UUID(), role: .user, content: query, createdAt: now)
         let assistantContent = synthesizeAIResponse(query: query, mode: mode, options: options)
         let assistantMessage = AISession.Message(id: UUID(), role: .assistant, content: assistantContent, createdAt: now)
-        var session = AISession(id: sessionId,
+        let session = AISession(id: sessionId,
                                 projectId: projectId,
                                 mode: mode,
                                 createdAt: now,

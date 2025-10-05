@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import ServiceManagement
 
@@ -33,25 +34,25 @@ final class LoginItemManager: ObservableObject {
         }
 
         isUpdating = true
-        Task {
+        Task { @MainActor [self] in
             do {
-                if enabled {
-                    try SMAppService.mainApp.register()
-                } else {
-                    try SMAppService.mainApp.unregister()
-                }
-                await MainActor.run {
-                    self.isEnabled = enabled
-                    self.errorMessage = nil
-                    self.isUpdating = false
-                }
+                try updateLoginItem(enabled: enabled)
+                isEnabled = enabled
+                errorMessage = nil
             } catch {
-                await MainActor.run {
-                    self.refresh()
-                    self.errorMessage = error.localizedDescription
-                    self.isUpdating = false
-                }
+                refresh()
+                errorMessage = error.localizedDescription
             }
+            isUpdating = false
+        }
+    }
+
+    @available(macOS 13.0, *)
+    private func updateLoginItem(enabled: Bool) throws {
+        if enabled {
+            try SMAppService.mainApp.register()
+        } else {
+            try SMAppService.mainApp.unregister()
         }
     }
 }
