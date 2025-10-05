@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" 
+     xmlns:fire="http://wixtoolset.org/schemas/v4/wxs/firewall">
+  
+  <!-- Product definition -->
+  <Product Id="*" 
+           Name="Chronicae" 
+           Language="1033" 
+           Version="1.0.0.0" 
+           Manufacturer="Chronicae Team" 
+           UpgradeCode="12345678-1234-1234-1234-123456789012">
+    
+    <Package InstallerVersion="200" 
+             Compressed="yes" 
+             InstallScope="perMachine" 
+             Description="Chronicae - Note Management Application"
+             Comments="A powerful note management application for Windows" />
+
+    <!-- Media and source -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Features -->
+    <Feature Id="ProductFeature" Title="Chronicae Application" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="FirewallComponent" />
+    </Feature>
+
+    <!-- UI -->
+    <UIRef Id="WixUI_InstallDir" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    
+    <!-- License -->
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+    
+    <!-- Installation directory structure -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="Chronicae" />
+      </Directory>
+      
+      <!-- Start Menu -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="Chronicae" />
+      </Directory>
+      
+      <!-- Desktop -->
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+  </Product>
+
+  <!-- Components -->
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      
+      <!-- Main executable -->
+      <Component Id="MainExecutable" Guid="*">
+        <File Id="ChronicaeDesktopExe" 
+              Source="..\publish\win-x64\Chronicae.Desktop.exe" 
+              KeyPath="yes" 
+              Checksum="yes">
+          <fire:FirewallException Id="ChronicaeFirewall" 
+                                  Name="Chronicae HTTP Server" 
+                                  Port="8843" 
+                                  Protocol="tcp" 
+                                  Scope="localSubnet" 
+                                  IgnoreFailure="yes" />
+        </File>
+      </Component>
+      
+      <!-- Configuration files -->
+      <Component Id="ConfigFiles" Guid="*">
+        <File Id="AppSettingsJson" 
+              Source="..\publish\win-x64\appsettings.json" 
+              KeyPath="yes" />
+        <File Id="AppSettingsDevJson" 
+              Source="..\publish\win-x64\appsettings.Development.json" />
+      </Component>
+      
+      <!-- Runtime files -->
+      <Component Id="RuntimeFiles" Guid="*">
+        <File Id="ServerDepsJson" 
+              Source="..\publish\win-x64\Chronicae.Server.deps.json" 
+              KeyPath="yes" />
+        <File Id="ServerRuntimeConfigJson" 
+              Source="..\publish\win-x64\Chronicae.Server.runtimeconfig.json" />
+        <File Id="PackageLockJson" 
+              Source="..\publish\win-x64\package-lock.json" />
+      </Component>
+      
+      <!-- Debug symbols (optional) -->
+      <Component Id="DebugSymbols" Guid="*">
+        <File Id="CorePdb" 
+              Source="..\publish\win-x64\Chronicae.Core.pdb" 
+              KeyPath="yes" />
+        <File Id="DataPdb" 
+              Source="..\publish\win-x64\Chronicae.Data.pdb" />
+        <File Id="DesktopPdb" 
+              Source="..\publish\win-x64\Chronicae.Desktop.pdb" />
+        <File Id="ServerPdb" 
+              Source="..\publish\win-x64\Chronicae.Server.pdb" />
+      </Component>
+      
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Shortcuts -->
+  <Fragment>
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="*">
+      <Shortcut Id="ApplicationStartMenuShortcut"
+                Name="Chronicae"
+                Description="Chronicae Note Management Application"
+                Target="[#ChronicaeDesktopExe]"
+                WorkingDirectory="INSTALLFOLDER" />
+      
+      <Shortcut Id="ApplicationDesktopShortcut"
+                Directory="DesktopFolder"
+                Name="Chronicae"
+                Description="Chronicae Note Management Application"
+                Target="[#ChronicaeDesktopExe]"
+                WorkingDirectory="INSTALLFOLDER" />
+      
+      <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" 
+                     Key="Software\Chronicae\Installed" 
+                     Name="installed" 
+                     Type="integer" 
+                     Value="1" 
+                     KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <!-- Firewall component -->
+  <Fragment>
+    <Component Id="FirewallComponent" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryValue Root="HKLM" 
+                     Key="Software\Chronicae\Firewall" 
+                     Name="configured" 
+                     Type="integer" 
+                     Value="1" 
+                     KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+</Wix>

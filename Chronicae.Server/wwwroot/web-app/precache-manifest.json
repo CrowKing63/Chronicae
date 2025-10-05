@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2025-10-05T11:16:35.032Z",
+  "version": "3b592cd4cc48adff",
+  "assets": [
+    {
+      "path": "assets/index-CFPgsnYq.css",
+      "hash": "sgL+X2Cg8epgZPv6oo2Fyv48B7dqzThu0rgxAWjFVDI="
+    },
+    {
+      "path": "assets/index-DaiYNAgH.js",
+      "hash": "Q677pK9LuZzWDPC18o2Cg81carLrUfUJYk5ojvJxZhY="
+    },
+    {
+      "path": "index.html",
+      "hash": "b9kSukKQkxQdZeGB+UEUwaRSFWe77iqu7jDlKuf3LlI="
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# This directory will contain the built Vision SPA files
+# The build script will copy files from vision-spa/dist to this directory

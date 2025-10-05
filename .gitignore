@@ -1,0 +1,43 @@
+# Logs
+*.log
+logs/
+Chronicae.Server/logs/*.log
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.pdb
+*.exe
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# IDE files
+.vs/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node modules
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# Build outputs
+dist/
+build/
+publish/
+
+# Web app build files
+Chronicae.Server/wwwroot/web-app/assets/
+Chronicae.Server/wwwroot/web-app/.vite/

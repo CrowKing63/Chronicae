@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  
+  <!-- Product definition -->
+  <Package Name="Chronicae" 
+           Language="1033" 
+           Version="1.0.0.0" 
+           Manufacturer="Chronicae Team" 
+           UpgradeCode="12345678-1234-1234-1234-123456789012">
+    
+    <SummaryInformation Description="Chronicae - Note Management Application"
+                        Comments="A powerful note management application for Windows" />
+
+    <!-- Media and source -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Features -->
+    <Feature Id="ProductFeature" Title="Chronicae Application" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </Feature>
+
+    <!-- Installation directory structure -->
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="INSTALLFOLDER" Name="Chronicae" />
+    </StandardDirectory>
+    
+    <!-- Start Menu -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Chronicae" />
+    </StandardDirectory>
+    
+    <!-- Desktop -->
+    <StandardDirectory Id="DesktopFolder" />
+  </Package>
+
+  <!-- Components -->
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      
+      <!-- Main executable -->
+      <Component Id="MainExecutable" Guid="11111111-1111-1111-1111-111111111111">
+        <File Id="ChronicaeDesktopExe" 
+              Source="..\publish\win-x64\Chronicae.Desktop.exe" />
+      </Component>
+      
+      <!-- Configuration files -->
+      <Component Id="AppSettingsJsonComp" Guid="22222222-2222-2222-2222-222222222222">
+        <File Id="AppSettingsJson" 
+              Source="..\publish\win-x64\appsettings.json" />
+      </Component>
+      
+      <Component Id="AppSettingsDevJsonComp" Guid="33333333-3333-3333-3333-333333333333">
+        <File Id="AppSettingsDevJson" 
+              Source="..\publish\win-x64\appsettings.Development.json" />
+      </Component>
+      
+      <!-- Runtime files -->
+      <Component Id="ServerDepsJsonComp" Guid="44444444-4444-4444-4444-444444444444">
+        <File Id="ServerDepsJson" 
+              Source="..\publish\win-x64\Chronicae.Server.deps.json" />
+      </Component>
+      
+      <Component Id="ServerRuntimeConfigJsonComp" Guid="55555555-5555-5555-5555-555555555555">
+        <File Id="ServerRuntimeConfigJson" 
+              Source="..\publish\win-x64\Chronicae.Server.runtimeconfig.json" />
+      </Component>
+      
+      <Component Id="PackageLockJsonComp" Guid="66666666-6666-6666-6666-666666666666">
+        <File Id="PackageLockJson" 
+              Source="..\publish\win-x64\package-lock.json" />
+      </Component>
+      
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Shortcuts -->
+  <Fragment>
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="77777777-7777-7777-7777-777777777777">
+      <Shortcut Id="ApplicationStartMenuShortcut"
+                Name="Chronicae"
+                Description="Chronicae Note Management Application"
+                Target="[#ChronicaeDesktopExe]"
+                WorkingDirectory="INSTALLFOLDER" />
+      
+      <Shortcut Id="ApplicationDesktopShortcut"
+                Directory="DesktopFolder"
+                Name="Chronicae"
+                Description="Chronicae Note Management Application"
+                Target="[#ChronicaeDesktopExe]"
+                WorkingDirectory="INSTALLFOLDER" />
+      
+      <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" 
+                     Key="Software\Chronicae\Installed" 
+                     Name="installed" 
+                     Type="integer" 
+                     Value="1" 
+                     KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+</Wix>

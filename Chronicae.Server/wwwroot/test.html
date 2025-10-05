@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Page</title>
+</head>
+<body>
+    <h1>Test Page</h1>
+    <p>If you can see this, the server is working.</p>
+    <div id="api-test">Testing API...</div>
+    
+    <script>
+        console.log('Test page loaded');
+        
+        fetch('/api/projects')
+            .then(response => {
+                console.log('API Response:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('API Data:', data);
+                document.getElementById('api-test').innerHTML = 'API works! Data: ' + JSON.stringify(data);
+            })
+            .catch(error => {
+                console.error('API Error:', error);
+                document.getElementById('api-test').innerHTML = 'API Error: ' + error.message;
+            });
+    </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppEventType, NoteSummary, VersionSnapshot, BackupRecordPayload, ProjectSummary, NoteListResponse } from './types';
-import { useEventStream } from './hooks/useEventStream';
+import { useSignalR } from './hooks/useSignalR';
 import { ToastStack } from './components/ToastStack';
 import { Timeline } from './components/Timeline';
 import { NoteList } from './components/NoteList';
@@ -64,6 +64,7 @@ const tagsEqual = (left: string[] = [], right: string[] = []) => {
 };
 
 const App = () => {
+  console.log('[Chronicae] App component is mounting...');
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [notes, setNotes] = useState<NoteSummary[]>([]);
@@ -520,25 +521,25 @@ const App = () => {
     await loadNotes(activeProjectId, { cursor: noteCursor, preserveSelection: true });
   }, [activeProjectId, noteCursor, isLoadingMoreNotes, loadNotes]);
 
-  useEventStream('/api/events', {
+  useSignalR('/api/events', {
     onOpen: () => setStatusBadge({ text: '실시간 동기화 중', variant: 'badge--connected' }),
     onError: () => setStatusBadge({ text: '연결 지연 - 자동 재시도 중', variant: 'badge--error' }),
-    onEvent: event => {
-      switch (event.type) {
+    onEvent: message => {
+      switch (message.event) {
         case AppEventType.ProjectReset:
         case AppEventType.ProjectDeleted:
         case AppEventType.ProjectSwitched:
           refreshAll();
           break;
         case AppEventType.NoteCreated: {
-          const note = JSON.parse(event.data) as NoteSummary;
+          const note = message.data as NoteSummary;
           setNotes(prev => mergeNotes(prev, note));
           showToast('새 노트를 수신했습니다', '✨');
           void fetchProjects({ preserveSelection: true });
           break;
         }
         case AppEventType.NoteUpdated: {
-          const note = JSON.parse(event.data) as NoteSummary;
+          const note = message.data as NoteSummary;
           setNotes(prev => mergeNotes(prev, note));
           if (note.id === selectedNoteId && !isEditing) {
             setDraft(toDraft(note));
@@ -548,7 +549,7 @@ const App = () => {
           break;
         }
         case AppEventType.NoteDeleted: {
-          const payload = JSON.parse(event.data) as { id: string };
+          const payload = message.data as { id: string };
           setNotes(prev => prev.filter(note => note.id !== payload.id));
           if (selectedNoteId === payload.id) {
             setSelectedNoteId(null);
@@ -571,7 +572,7 @@ const App = () => {
           showToast('AI 응답이 도착했습니다', '🤖');
           break;
         case AppEventType.BackupCompleted: {
-          const payload = JSON.parse(event.data) as BackupRecordPayload;
+          const payload = message.data as BackupRecordPayload;
           showToast(`백업 완료 (${new Date(payload.completedAt).toLocaleTimeString()})`, '🗄');
           break;
         }
