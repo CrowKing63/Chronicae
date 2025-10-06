@@ -10,7 +10,7 @@ Write-Host "Building Vision SPA..." -ForegroundColor Green
 # Resolve full paths
 $scriptDir = Split-Path -Parent $PSScriptRoot
 $fullSourcePath = Join-Path $scriptDir $SourcePath
-$fullSourcePath = Resolve-Path $fullSourcePath
+$fullSourcePath = (Resolve-Path $fullSourcePath).Path
 
 Write-Host "Source path: $fullSourcePath" -ForegroundColor Yellow
 
@@ -26,14 +26,14 @@ try {
             throw "npm install failed"
         }
     }
-    
+
     # Build the project
     Write-Host "Building project..." -ForegroundColor Yellow
     npm run build
     if ($LASTEXITCODE -ne 0) {
         throw "npm run build failed"
     }
-    
+
     Write-Host "Build completed successfully" -ForegroundColor Green
 }
 catch {
@@ -48,9 +48,16 @@ finally {
 # Copy built files to target directory
 Write-Host "Copying files to $TargetPath..." -ForegroundColor Green
 
-$scriptDir = Split-Path -Parent $PSScriptRoot
 $fullTargetPath = Join-Path $scriptDir $TargetPath
 $distPath = Join-Path $fullSourcePath "dist"
+
+Write-Host "Copying from: $distPath" -ForegroundColor Yellow
+Write-Host "Copying to:   $fullTargetPath" -ForegroundColor Yellow
+
+if (!(Test-Path $distPath)) {
+    Write-Error "Source directory not found: $distPath"
+    exit 1
+}
 
 # Create target directory if it doesn't exist
 if (!(Test-Path $fullTargetPath)) {
@@ -58,15 +65,11 @@ if (!(Test-Path $fullTargetPath)) {
 }
 
 # Remove existing files (except .gitkeep)
-Get-ChildItem $fullTargetPath -Exclude ".gitkeep" | Remove-Item -Recurse -Force
+Get-ChildItem -Path $fullTargetPath -Exclude ".gitkeep" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
 
 # Copy new files
-if (Test-Path $distPath) {
-    Copy-Item "$distPath/*" $fullTargetPath -Recurse -Force
-    Write-Host "Files copied successfully" -ForegroundColor Green
-} else {
-    Write-Error "Source directory not found: $distPath"
-    exit 1
-}
+$distWildcard = Join-Path $distPath '*'
+Copy-Item -Path $distWildcard -Destination $fullTargetPath -Recurse -Force
+Write-Host "Files copied successfully" -ForegroundColor Green
 
 Write-Host "Web app deployment completed!" -ForegroundColor Green
